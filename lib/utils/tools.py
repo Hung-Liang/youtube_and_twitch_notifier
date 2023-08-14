@@ -32,8 +32,8 @@ def load_json(path):
     return data
 
 
-def write_json(path, data):
-    """Write Json to Select File
+def save_json(path, data):
+    """Save Json to Select File
 
     Args:
         `path`: File path
@@ -94,7 +94,7 @@ def get_upload_id(channel_id):
 
         if upload_id:
             upload_playlist[channel_id] = upload_id
-            write_json(UPLOAD_PLAYLIST_JSON_PATH, upload_playlist)
+            save_json(UPLOAD_PLAYLIST_JSON_PATH, upload_playlist)
             return upload_id
         else:
             return None
@@ -107,6 +107,9 @@ def get_live_title_and_url(upload_id):
 
     ignore_list = load_json(IGNORE_JSON_PATH)
 
+    if len(ignore_list) > 100:
+        ignore_list = dict(list(ignore_list.items())[-10:] or ignore_list)
+
     title = None
     url = None
 
@@ -116,24 +119,19 @@ def get_live_title_and_url(upload_id):
 
             if (
                 video_info["items"][0]["snippet"]["liveBroadcastContent"]
+                == "upcoming"
+            ):
+                continue
+
+            if (
+                video_info["items"][0]["snippet"]["liveBroadcastContent"]
                 == "live"
             ):
                 title = video_info["items"][0]["snippet"]["title"]
                 url = "https://www.youtube.com/watch?v={}".format(video_id)
 
-                ignore_list[video_id] = video_info["items"][0]["snippet"][
-                    "title"
-                ]
-                write_json(IGNORE_JSON_PATH, ignore_list)
-
-            elif (
-                video_info["items"][0]["snippet"]["liveBroadcastContent"]
-                == "none"
-            ):
-                ignore_list[video_id] = video_info["items"][0]["snippet"][
-                    "title"
-                ]
-                write_json(IGNORE_JSON_PATH, ignore_list)
+            ignore_list[video_id] = video_info["items"][0]["snippet"]["title"]
+            save_json(IGNORE_JSON_PATH, ignore_list)
 
     if not (title or url):
         title = None
