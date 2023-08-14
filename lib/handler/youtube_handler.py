@@ -49,7 +49,9 @@ class YoutubeHandler:
         else:
             return None
 
-    def find_recent_video(self, playlist_id, part="snippet", max_results=3):
+    def find_recent_video(
+        self, playlist_id, part="contentDetails", max_results=3
+    ):
         """Find recent video from Youtube playlist.
 
         Args:
@@ -72,7 +74,39 @@ class YoutubeHandler:
 
         log(
             '[youtube_lib]',
+            f'find recent video: {url}',
+        )
+        log(
+            '[youtube_lib]',
             f'find recent video: {res.status_code} {res.text}',
+        )
+
+        if res.status_code == 200:
+            return json.loads(res.text)["items"]
+        else:
+            return None
+
+    def get_video_info(self, video_id, part="snippet"):
+        """Get video info from Youtube.
+
+        Args:
+            `video_id`: Video ID.
+            `part`: Part to get.
+
+        Returns:
+            Video info.
+        """
+
+        url = (
+            "https://www.googleapis.com/youtube/v3/videos?"
+            "part={}&id={}&key={}".format(part, video_id, self.token)
+        )
+
+        res = requests.get(url)
+
+        log(
+            '[youtube_lib]',
+            f'get video info: {res.status_code} {res.text}',
         )
 
         if res.status_code == 200:
