@@ -1,0 +1,5 @@
+.env
+asset/
+log/
+test.*
+**/__pycache__/
