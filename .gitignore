@@ -3,3 +3,4 @@ asset/
 log/
 test.*
 **/__pycache__/
+lib/config.py
