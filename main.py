@@ -1,16 +1,10 @@
 from time import sleep, time
 
+from lib.config import groups
 from lib.utils.notify import send_notify
-from lib.utils.tools import send_exception_log, send_daily_log
+from lib.utils.tools import send_daily_log, send_exception_log
 
-notify_list = [
-    ("", "group_1"),
-    ("", "group_1"),
-    ("", "group_2"),
-    ("", "group_3"),
-    ("", "group_3"),
-    ("", "group_3"),
-]
+notify_list = groups
 
 
 while True:

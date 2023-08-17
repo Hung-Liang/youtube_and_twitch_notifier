@@ -1,38 +1,24 @@
-import os
-
-from dotenv import load_dotenv
-
 from lib.handler.discord_handler import DiscordHandler
 from lib.handler.telegram_handler import TelegramHandler
 from lib.utils.logger import log
 from lib.utils.tools import (
+    get_id_list,
+    get_live_title_and_url,
     get_message,
     get_upload_id,
-    get_live_title_and_url,
 )
-
-load_dotenv()
 
 
 def send_notify(channel_id, group="group_1"):
-    telegram_channel_id = os.environ.get("telegram_channel_id")
-
-    if group == "group_1":
-        id_list = [
-            telegram_channel_id,
-        ]
-
-    elif group == "group_2":
-        id_list = []  #
-
-    elif group == "group_3":
-        id_list = []  # mine
+    id_list = get_id_list(group)
 
     upload_id = get_upload_id(channel_id)
-    title, url = get_live_title_and_url(upload_id)
+    title, url, channel_title = get_live_title_and_url(upload_id)
 
     if title:
-        telegram_message, discord_message = get_message(title, url, group)
+        telegram_message, discord_message = get_message(
+            title, url, channel_title, group
+        )
 
         log("[main]", "Telegram Message: ", telegram_message)
         log("[main]", "Discord Message: ", discord_message)
