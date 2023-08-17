@@ -1,5 +1,6 @@
 import json
 import os
+import random
 from pathlib import Path
 from time import time
 
@@ -8,8 +9,8 @@ from dotenv import load_dotenv
 from lib.handler.telegram_handler import TelegramHandler
 from lib.handler.youtube_handler import YoutubeHandler
 from lib.utils.file_path import (
-    LOG_PATH,
     IGNORE_JSON_PATH,
+    LOG_PATH,
     UPLOAD_PLAYLIST_JSON_PATH,
 )
 from lib.utils.logger import log
@@ -43,12 +44,21 @@ def save_json(path, data):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
-def get_message(title, url):
-    telegram_message = (
-        "<b>軍團長開台啦！！！</b>\n<a href='{}'><b>{}</b></a>".format(url, title)
+def get_message(title, url, group):
+    if group == "group_1":
+        word_list = [""]
+    else:
+        word_list = [""]
+
+    random_word = random.choice(word_list)
+
+    telegram_message = "<b>{}</b>\n<a href='{}'><b>{}</b></a>".format(
+        random_word, url, title
     )
 
-    discord_message = "@everyone\n軍團長開台啦！！！\n\n[{}]({})".format(title, url)
+    discord_message = "@everyone\n{}\n\n[{}]({})".format(
+        random_word, title, url
+    )
 
     return telegram_message, discord_message
 
@@ -108,7 +118,7 @@ def get_live_title_and_url(upload_id):
     ignore_list = load_json(IGNORE_JSON_PATH)
 
     if len(ignore_list) > 100:
-        ignore_list = dict(list(ignore_list.items())[-10:] or ignore_list)
+        ignore_list = dict(list(ignore_list.items())[-50:] or ignore_list)
 
     title = None
     url = None
