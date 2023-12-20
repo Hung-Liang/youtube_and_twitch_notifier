@@ -6,6 +6,7 @@ from lib.utils.tools import (
     get_live_title_and_url,
     get_message,
     get_upload_id,
+    send_exception_log,
 )
 
 
@@ -24,8 +25,17 @@ def send_notify(channel_id, group="group_1"):
         log("[main]", "Discord Message: ", discord_message)
 
         for cid in id_list:
-            TelegramHandler().send_message(cid, telegram_message)
+            sent = TelegramHandler().send_message(cid, telegram_message)
+
+            if not sent:
+                sent = telegram_message, discord_message = get_message(
+                    "", url, channel_title, group
+                )
+                sent = TelegramHandler().send_message(cid, telegram_message)
+                send_exception_log("[main] Telegram Message Sent Failed")
 
         # TelegramHandler().send_message(telegram_channel_id, telegram_message)
         if group == "group_1":
-            DiscordHandler().send_message(discord_message)
+            sent = DiscordHandler().send_message(discord_message)
+            if not sent:
+                send_exception_log("[main] Discord Message Sent Failed")

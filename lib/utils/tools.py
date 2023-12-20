@@ -174,6 +174,9 @@ def get_live_title_and_url(upload_id):
                     "channelTitle"
                 ]
 
+                title = replace_html_sensitive_symbols(title)
+                channel_title = replace_html_sensitive_symbols(channel_title)
+
             ignore_list[video_id] = video_info["items"][0]["snippet"]["title"]
             save_json(IGNORE_JSON_PATH, ignore_list)
 
@@ -199,3 +202,25 @@ def get_id_list(group):
         id_list = group_id_3  # mine
 
     return id_list
+
+
+def replace_html_sensitive_symbols(text):
+    """Remove HTML Sensitive Symbols from Select Text
+
+    Args:
+        `text`: Text
+
+    Returns:
+        A Text without HTML Sensitive Symbols
+    """
+    text = (
+        text.replace('%', '%25')
+        .replace('&', '%26')
+        .replace('+', '%2B')
+        .replace('#', '%23')
+        .replace('>', '%3E')
+        .replace('=', '%3D')
+        .replace('<', '%26lt;')
+    )
+
+    return text
