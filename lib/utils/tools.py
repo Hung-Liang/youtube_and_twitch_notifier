@@ -224,3 +224,22 @@ def replace_html_sensitive_symbols(text):
     )
 
     return text
+
+
+def find_raw_content_by_user_id(owner_id, plurks):
+    """Find raw content by user id
+
+    Args:
+        `owner_id`: User id.
+        `plurks`: Plurk results.
+
+    Returns:
+        Raw content list.
+    """
+
+    raw_contents = []
+    for plurk in plurks:
+        if plurk["owner_id"] == int(owner_id):
+            raw_contents.append(plurk["content_raw"])
+
+    return raw_contents

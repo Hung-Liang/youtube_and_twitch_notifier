@@ -1,5 +1,6 @@
 from lib.handler.discord_handler import DiscordHandler
 from lib.handler.telegram_handler import TelegramHandler
+from lib.handler.plurk_handler import PlurkHandler
 from lib.utils.logger import log
 from lib.utils.tools import (
     get_id_list,
@@ -7,7 +8,20 @@ from lib.utils.tools import (
     get_message,
     get_upload_id,
     send_exception_log,
+    find_raw_content_by_user_id,
 )
+
+
+def send_plurk_updates(owner_id):
+    plurk = PlurkHandler()
+    result = plurk.find_plurk(minutes=3)
+    contents = find_raw_content_by_user_id(owner_id, result['plurks'])
+
+    for content in contents:
+        log('[main]', 'Plurk Content: ', content)
+        sent = DiscordHandler(mode="test").send_message(content)
+        if not sent:
+            send_exception_log('[main] Plurk Message Sent Failed')
 
 
 def send_notify(channel_id, group="group_1"):
