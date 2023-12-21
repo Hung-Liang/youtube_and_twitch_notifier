@@ -3,6 +3,7 @@ import os
 
 from dotenv import load_dotenv
 from plurk_oauth import PlurkAPI
+import json
 
 load_dotenv()
 
@@ -86,3 +87,49 @@ class PlurkHandler:
         )
 
         return result
+
+    def like_plurk(self, plurk_id):
+        """Favorite plurk by id
+
+        Args:
+            `plurk_id`: Plurk id.
+
+        Returns:
+            True if success, False if fail.
+        """
+
+        ids = json.dumps([plurk_id])
+
+        result = self.plurk.callAPI(
+            "/APP/Timeline/favoritePlurks",
+            options={"ids": ids},
+        )
+
+        print(result)
+
+        if result["success_text"] == 'ok':
+            return True
+        else:
+            return False
+
+    def replurk_plurk(self, plurk_id):
+        """Replurk plurk by id
+
+        Args:
+            `plurk_id`: Plurk id.
+
+        Returns:
+            True if success, False if fail.
+        """
+
+        ids = json.dumps([plurk_id])
+
+        result = self.plurk.callAPI(
+            "/APP/Timeline/replurk",
+            options={"ids": ids},
+        )
+
+        if result["success"]:
+            return True
+        else:
+            return False

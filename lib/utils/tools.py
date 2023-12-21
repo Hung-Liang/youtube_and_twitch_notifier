@@ -243,3 +243,22 @@ def find_raw_content_by_user_id(owner_id, plurks):
             raw_contents.append(plurk["content_raw"])
 
     return raw_contents
+
+
+def find_plurk_id_by_user_id(owner_id, plurks):
+    """Find plurk id by user id
+
+    Args:
+        `owner_id`: User id.
+        `plurks`: Plurk results.
+
+    Returns:
+        Plurk id list.
+    """
+
+    plurk_ids = []
+    for plurk in plurks:
+        if plurk["owner_id"] == int(owner_id):
+            plurk_ids.append(plurk["plurk_id"])
+
+    return plurk_ids
