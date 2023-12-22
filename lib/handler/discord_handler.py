@@ -18,8 +18,8 @@ class DiscordHandler:
     def __init__(self, mode="prod"):
         if mode == "prod":
             self.webhook_url = os.environ.get("discord_webhook_url")
-        elif mode == "test":
-            self.webhook_url = os.environ.get("discord_webhook_url_test")
+        elif mode == "plurk":
+            self.webhook_url = os.environ.get("discord_webhook_url_plurk")
 
     def send_message(self, msg):
         """Send message to Discord.

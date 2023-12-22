@@ -105,8 +105,6 @@ class PlurkHandler:
             options={"ids": ids},
         )
 
-        print(result)
-
         if result["success_text"] == 'ok':
             return True
         else:

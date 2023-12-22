@@ -18,13 +18,17 @@ def send_plurk_updates(owner_id):
     result = plurk.find_plurk(minutes=3)
     contents = find_raw_content_by_user_id(owner_id, result['plurks'])
 
+    log('[main]', 'Plurk Result: ', result)
+    log('[main]', 'Plurk Contents: ', contents)
+
     for content in contents:
         log('[main]', 'Plurk Content: ', content)
-        sent = DiscordHandler(mode="test").send_message(content)
+        sent = DiscordHandler(mode="plurk").send_message(content)
         if not sent:
             send_exception_log('[main] Plurk Message Sent Failed')
 
     plurk_ids = find_plurk_id_by_user_id(owner_id, result['plurks'])
+    log('[main]', 'Plurk IDs: ', plurk_ids)
 
     for plurk_id in plurk_ids:
         plurk.like_plurk(plurk_id)
