@@ -2,21 +2,22 @@ import json
 import os
 import random
 from pathlib import Path
-from time import time
 
 from dotenv import load_dotenv
 
-from lib.config import group_id_1, group_id_2, group_id_3
 from lib.handler.telegram_handler import TelegramHandler
+from lib.handler.twitch_handler import TwitchHandler
 from lib.handler.youtube_handler import YoutubeHandler
 from lib.utils.file_path import (
-    IGNORE_JSON_PATH,
+    IGNORE_PATH,
     LOG_PATH,
     UPLOAD_PLAYLIST_JSON_PATH,
 )
 from lib.utils.logger import log
 
 load_dotenv()
+
+TELEGRAM_ADMIN_ID = os.environ.get("telegram_admin_id")
 
 
 def load_json(path):
@@ -45,7 +46,7 @@ def save_json(path, data):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
-def get_message(title, url, channel_title, group):
+def get_message(notifier_type, title, url, channel_title, word_list):
     """Get Message from Select Title, URL and Channel Title
 
     Args:
@@ -56,40 +57,30 @@ def get_message(title, url, channel_title, group):
     Returns:
         A Message of Select Title, URL and Channel Title
     """
-    # word_list = ["軍團長開台啦！！！", "快點進來看我",
-    # "今天想要做一點有趣的！", "開開開開開開台！", "來這邊，這邊好玩！"]
-    if group == "group_1":
-        word_list = ["時辰已到！", "休息時間！"]
+    if len(word_list) > 0:
+        random_word = random.choice(word_list)
     else:
-        word_list = [channel_title]
+        random_word = channel_title
 
-    random_word = random.choice(word_list)
+    if notifier_type == "telegram":
+        message = "<b>{}\n{}\n{}</b>".format(random_word, title, url)
+    elif notifier_type == "discord":
+        message = "@everyone\n{}\n\n[{}]({})".format(random_word, title, url)
 
-    # telegram_message = "<b>{}</b>\n<a href='{}'><b>{}</b></a>".format(
-    #     random_word, url, title
-    # )
-    telegram_message = "<b>{}\n{}\n{}</b>".format(random_word, title, url)
-
-    discord_message = "@everyone\n{}\n\n[{}]({})".format(
-        random_word, title, url
-    )
-
-    return telegram_message, discord_message
+    return message
 
 
 def send_daily_log():
     """Send Daily Log to Telegram Admin"""
-    if time() % 86400 <= 10:
-        telegram_admin_id = os.environ.get("telegram_admin_id")
 
-        filenames = os.listdir(LOG_PATH)
+    filenames = os.listdir(LOG_PATH)
 
-        for filename in filenames:
-            log_path = Path(LOG_PATH, filename)
-            TelegramHandler().send_document(
-                telegram_admin_id, log_path, "[Daily Log] " + filename
-            )
-            log_path.unlink()
+    for filename in filenames:
+        log_path = Path(LOG_PATH, filename)
+        TelegramHandler().send_document(
+            TELEGRAM_ADMIN_ID, log_path, "[Daily Log] " + filename
+        )
+        log_path.unlink()
 
 
 def send_exception_log(e):
@@ -98,13 +89,17 @@ def send_exception_log(e):
     Args:
         `e`: Exception
     """
-    telegram_admin_id = os.environ.get("telegram_admin_id")
+    log("=" * 80)
+    log("=" * 80)
 
     filename = log("[main]", e, return_filename=True)
 
+    log("=" * 80)
+    log("=" * 80)
+
     log_path = Path(LOG_PATH, filename)
     TelegramHandler().send_document(
-        telegram_admin_id, log_path, "[Exception] " + filename
+        TELEGRAM_ADMIN_ID, log_path, "[Exception] " + filename
     )
 
 
@@ -117,6 +112,9 @@ def get_upload_id(channel_id):
     Returns:
         A Upload Playlist ID of Select Channel
     """
+    if not Path(UPLOAD_PLAYLIST_JSON_PATH).exists():
+        save_json(UPLOAD_PLAYLIST_JSON_PATH, {})
+
     upload_playlist = load_json(UPLOAD_PLAYLIST_JSON_PATH)
 
     if channel_id in upload_playlist:
@@ -133,75 +131,101 @@ def get_upload_id(channel_id):
 
 
 def get_live_title_and_url(upload_id):
-    """Get Live Title, URL and Channel Title from Select Channel
+    """Get Live Title, URL, and Channel Title from the selected channel.
 
     Args:
-        `upload_id`: Upload Playlist ID of Select Channel
+        upload_id (str): Upload Playlist ID of the selected channel.
 
     Returns:
-        A Live Title, URL and Channel Title of Select Channel
+        tuple: (Live Title, URL, Channel Title) if live,
+            else (None, None, None).
     """
     videos = YoutubeHandler().find_recent_video(upload_id)
+    video_ids = [video["contentDetails"]["videoId"] for video in videos]
 
-    videos_ids = [video["contentDetails"]["videoId"] for video in videos]
+    ignore_json = Path(IGNORE_PATH, f"{upload_id}.json")
 
-    ignore_list = load_json(IGNORE_JSON_PATH)
+    ignore_list = load_ignore_json(ignore_json)
+
+    results = []
+
+    for video_id in video_ids:
+        if video_id in ignore_list:
+            continue
+
+        video_info = YoutubeHandler().get_video_info(video_id)
+        snippet = video_info["items"][0]["snippet"]
+        broadcast_status = snippet.get("liveBroadcastContent", "")
+        log("[main]", f"video_id: {video_id}")
+        log("[main]", f"broadcast_status: {broadcast_status}")
+
+        if broadcast_status in ["none", "live"]:
+            live_title = replace_html_sensitive_symbols(snippet["title"])
+            channel_title = replace_html_sensitive_symbols(
+                snippet["channelTitle"]
+            )
+            url = f"https://www.youtube.com/watch?v={video_id}"
+
+            update_ignore_json(ignore_json, ignore_list, video_id, live_title)
+            results.append([live_title, url, channel_title])
+
+    return results
+
+
+def get_twitch_title_and_url(channel_id):
+    """Get Live Title, URL, and Channel Title from the selected channel.
+
+    Args:
+        channel_id (str): Channel ID
+
+    Returns:
+        tuple: (Live Title, URL, Channel Title) if live,
+            else (None, None, None)
+    """
+    stream_info = TwitchHandler().get_stream_info(channel_id)
+    if not stream_info['is_live']:
+        return None, None, None
+
+    ignore_json = Path(IGNORE_PATH, f"{channel_id}.json")
+
+    ignore_list = load_ignore_json(ignore_json)
+    live_title = replace_html_sensitive_symbols(stream_info['title'])
+
+    if ignore_list.get(channel_id) == live_title:
+        return None, None, None
+
+    update_ignore_json(ignore_json, ignore_list, channel_id, live_title)
+    return live_title, f"https://www.twitch.tv/{channel_id}", channel_id
+
+
+def load_ignore_json(json_path):
+    """Load Ignore Json
+
+    Returns:
+        A Ignore Json
+    """
+
+    if not Path(json_path).exists():
+        create_empty_json(json_path)
+
+    ignore_list = load_json(json_path)
 
     if len(ignore_list) > 100:
         ignore_list = dict(list(ignore_list.items())[-50:] or ignore_list)
 
-    title = None
-    url = None
-    channel_title = None
-
-    for video_id in videos_ids:
-        if video_id not in ignore_list:
-            video_info = YoutubeHandler().get_video_info(video_id)
-
-            if (
-                video_info["items"][0]["snippet"]["liveBroadcastContent"]
-                == "upcoming"
-            ):
-                continue
-
-            if (
-                video_info["items"][0]["snippet"]["liveBroadcastContent"]
-                == "live"
-            ):
-                title = video_info["items"][0]["snippet"]["title"]
-                url = "https://www.youtube.com/watch?v={}".format(video_id)
-                channel_title = video_info["items"][0]["snippet"][
-                    "channelTitle"
-                ]
-
-                title = replace_html_sensitive_symbols(title)
-                channel_title = replace_html_sensitive_symbols(channel_title)
-
-            ignore_list[video_id] = video_info["items"][0]["snippet"]["title"]
-            save_json(IGNORE_JSON_PATH, ignore_list)
-
-    return title, url, channel_title
+    return ignore_list
 
 
-def get_id_list(group):
-    """Get ID List from Select Group
+def update_ignore_json(json_path, ignore_list, key, value):
+    """Update Ignore Json
 
     Args:
-        `group`: Group name
-
-    Returns:
-        A ID List of Select Group
+        `ignore_list`: Ignore List
+        `key`: Key
+        `value`: Value
     """
-    if group == "group_1":
-        id_list = group_id_1  # mine, chu, chu telegram channel
-
-    elif group == "group_2":
-        id_list = group_id_2  # mine, tata
-
-    elif group == "group_3":
-        id_list = group_id_3  # mine
-
-    return id_list
+    ignore_list[key] = value
+    save_json(json_path, ignore_list)
 
 
 def replace_html_sensitive_symbols(text):
@@ -226,39 +250,11 @@ def replace_html_sensitive_symbols(text):
     return text
 
 
-def find_raw_content_by_user_id(owner_id, plurks):
-    """Find raw content by user id
+def create_empty_json(json_path):
+    """Create Empty Json
 
     Args:
-        `owner_id`: User id.
-        `plurks`: Plurk results.
-
-    Returns:
-        Raw content list.
+        `json_path`: Json Path
     """
-
-    raw_contents = []
-    for plurk in plurks:
-        if plurk["owner_id"] == int(owner_id):
-            raw_contents.append(plurk["content_raw"])
-
-    return raw_contents
-
-
-def find_plurk_id_by_user_id(owner_id, plurks):
-    """Find plurk id by user id
-
-    Args:
-        `owner_id`: User id.
-        `plurks`: Plurk results.
-
-    Returns:
-        Plurk id list.
-    """
-
-    plurk_ids = []
-    for plurk in plurks:
-        if plurk["owner_id"] == int(owner_id):
-            plurk_ids.append(plurk["plurk_id"])
-
-    return plurk_ids
+    if not Path(json_path).exists():
+        save_json(json_path, {})

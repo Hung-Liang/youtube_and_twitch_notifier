@@ -1,26 +1,28 @@
-from time import sleep, time
+import pytz
+from apscheduler.schedulers.blocking import BlockingScheduler
 
-from lib.config import groups, owner_id
-from lib.utils.logger import log
-from lib.utils.notify import send_notify, send_plurk_updates
-from lib.utils.tools import send_daily_log, send_exception_log
+from lib.config import groups
+from lib.utils.notify import send_notify
+from lib.utils.tools import send_daily_log
 
-while True:
-    sleep(180 - time() % 180)
 
-    try:
-        log("[main]", "Send Daily Log")
-        send_daily_log()
+def schedule_group_jobs(scheduler, platform, group_data):
+    for group, config in group_data.items():
+        interval = config["interval"]
+        scheduler.add_job(
+            send_notify,
+            "cron",
+            minute=f"0-59/{interval}",
+            args=[platform, config],
+        )
 
-        log("[main]", "Send Notify")
-        if time() % 360 <= 10:
-            for channel_id, group in groups:
-                send_notify(channel_id, group)
-        else:
-            for channel_id, group in groups[:2]:
-                send_notify(channel_id, group)
 
-        log("[main]", "Send Plurk Updates")
-        send_plurk_updates(owner_id)
-    except Exception as e:
-        send_exception_log(e)
+timezone = pytz.timezone("Asia/Taipei")
+scheduler = BlockingScheduler(timezone=timezone)
+
+schedule_group_jobs(scheduler, "youtube", groups["youtube"])
+schedule_group_jobs(scheduler, "twitch", groups["twitch"])
+
+scheduler.add_job(send_daily_log, "cron", hour=0, minute=0)
+
+scheduler.start()

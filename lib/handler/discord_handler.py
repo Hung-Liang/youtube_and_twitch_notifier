@@ -1,5 +1,3 @@
-import os
-
 import requests
 from dotenv import load_dotenv
 
@@ -15,11 +13,8 @@ class DiscordHandler:
         `webhook_url`: Discord webhook url.
     """
 
-    def __init__(self, mode="prod"):
-        if mode == "prod":
-            self.webhook_url = os.environ.get("discord_webhook_url")
-        elif mode == "plurk":
-            self.webhook_url = os.environ.get("discord_webhook_url_plurk")
+    def __init__(self, webhook_url):
+        self.webhook_url = webhook_url
 
     def send_message(self, msg):
         """Send message to Discord.
