@@ -1,6 +1,6 @@
-from lib.handler.discord_handler import DiscordHandler
-from lib.handler.telegram_handler import TelegramHandler
-from lib.utils.tools import (
+from libs.handler.discord_handler import DiscordHandler
+from libs.handler.telegram_handler import TelegramHandler
+from libs.utils.tools import (
     get_live_title_and_url,
     get_message,
     get_twitch_title_and_url,

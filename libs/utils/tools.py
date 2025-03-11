@@ -5,15 +5,15 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from lib.handler.telegram_handler import TelegramHandler
-from lib.handler.twitch_handler import TwitchHandler
-from lib.handler.youtube_handler import YoutubeHandler
-from lib.utils.file_path import (
+from libs.handler.telegram_handler import TelegramHandler
+from libs.handler.twitch_handler import TwitchHandler
+from libs.handler.youtube_handler import YoutubeHandler
+from libs.utils.file_path import (
     IGNORE_PATH,
     LOG_PATH,
     UPLOAD_PLAYLIST_JSON_PATH,
 )
-from lib.utils.logger import log
+from libs.utils.logger import log
 
 load_dotenv()
 

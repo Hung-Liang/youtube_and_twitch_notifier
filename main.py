@@ -1,9 +1,9 @@
 import pytz
 from apscheduler.schedulers.blocking import BlockingScheduler
 
-from lib.config import groups
-from lib.utils.notify import send_notify
-from lib.utils.tools import send_daily_log
+from libs.config import groups
+from libs.utils.notify import send_notify
+from libs.utils.tools import send_daily_log
 
 
 def schedule_group_jobs(scheduler, platform, group_data):

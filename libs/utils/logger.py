@@ -1,7 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
-from lib.utils.file_path import LOG_PATH
+from libs.utils.file_path import LOG_PATH
 
 
 def log(*messages, console: bool = False, return_filename: bool = False):

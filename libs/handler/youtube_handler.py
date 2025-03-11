@@ -4,7 +4,7 @@ import os
 import requests
 from dotenv import load_dotenv
 
-from lib.utils.logger import log
+from libs.utils.logger import log
 
 load_dotenv()
 
