@@ -17,14 +17,15 @@ groups = {
     "youtube": {
         "group1": {
             "interval": 3,
-            "channel_id": [],
+            "channel_ids": [],
+            "broadcast_types":[],
             "notifier_types": {
                 "telegram": {
-                    "recipient_id": [],
+                    "recipient_ids": [],
                     "word_list": [],
                 },
                 "discord": {
-                    "webhook_url": [],
+                    "webhook_urls": [],
                     "word_list": [],
                 },
             },
@@ -33,14 +34,14 @@ groups = {
     "twitch": {
         "group1": {
             "interval": 3,
-            "channel_id": [],
+            "channel_ids": [],
             "notifier_types": {
                 "telegram": {
-                    "recipient_id": [],
+                    "recipient_ids": [],
                     "word_list": [],
                 },
                 "discord": {
-                    "webhook_url": [],
+                    "webhook_urls": [],
                     "word_list": [],
                 },
             },
@@ -48,11 +49,16 @@ groups = {
     },
 }
 
+
 ```
 
 - You can add as many groups under `youtube` and `twitch` as you want.
-- You can add as many `channel_id` as you want under each group.
-- You can add as many `recipient_id` and `webhook_url` as you want under each notifier type.
+- You can add as many `channel_ids` as you want under each group.
+- `broadcast_types` is only used for youtube, you can set it to `live`, `upcoming` or `none`.
+  - `live`: live stream.
+  - `upcoming`: upcoming stream.
+  - `none`: normal video or ended stream.
+- You can add as many `recipient_ids` and `webhook_urls` as you want under each notifier type.
 - You can add as many `word_list` as you want under each notifier type.
   - word_list is a list of words will randomly be selected and added to the top of the message.
   - if the word_list is empty, the top of the message will be stream channel name.
@@ -92,6 +98,11 @@ twitch_client_secret=""
 
 - Go to the twitch channel you want to get the id of.
   - The id is in the url after `twitch.tv/`.
+
+## Todo
+
+- Add more notifier types.
+- Issue when a channel id in config in different group will cause second group to not work.
 
 ## Support me
 

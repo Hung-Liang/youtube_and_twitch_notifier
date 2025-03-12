@@ -2,14 +2,15 @@ groups = {
     "youtube": {
         "group1": {
             "interval": 3,
-            "channel_id": [],
+            "channel_ids": [],
+            "broadcast_types": [],
             "notifier_types": {
                 "telegram": {
-                    "recipient_id": [],
+                    "recipient_ids": [],
                     "word_list": [],
                 },
                 "discord": {
-                    "webhook_url": [],
+                    "webhook_urls": [],
                     "word_list": [],
                 },
             },
@@ -18,14 +19,14 @@ groups = {
     "twitch": {
         "group1": {
             "interval": 3,
-            "channel_id": [],
+            "channel_ids": [],
             "notifier_types": {
                 "telegram": {
-                    "recipient_id": [],
+                    "recipient_ids": [],
                     "word_list": [],
                 },
                 "discord": {
-                    "webhook_url": [],
+                    "webhook_urls": [],
                     "word_list": [],
                 },
             },

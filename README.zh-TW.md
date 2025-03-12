@@ -17,14 +17,15 @@ groups = {
     "youtube": {
         "group1": {
             "interval": 3,
-            "channel_id": [],
+            "channel_ids": [],
+            "broadcast_types":[],
             "notifier_types": {
                 "telegram": {
-                    "recipient_id": [],
+                    "recipient_ids": [],
                     "word_list": [],
                 },
                 "discord": {
-                    "webhook_url": [],
+                    "webhook_urls": [],
                     "word_list": [],
                 },
             },
@@ -33,14 +34,14 @@ groups = {
     "twitch": {
         "group1": {
             "interval": 3,
-            "channel_id": [],
+            "channel_ids": [],
             "notifier_types": {
                 "telegram": {
-                    "recipient_id": [],
+                    "recipient_ids": [],
                     "word_list": [],
                 },
                 "discord": {
-                    "webhook_url": [],
+                    "webhook_urls": [],
                     "word_list": [],
                 },
             },
@@ -52,9 +53,13 @@ groups = {
 ### 配置說明
 
 - `youtube` 和 `twitch` 可分別新增多個 `group`（群組）。  
-- 每個群組內可新增多個 `channel_id`（頻道 ID）。  
+- 每個群組內可新增多個 `channel_ids`（頻道 ID）。  
+- `broadcast_types` 只有Youtube會使用到這個參數，可設定 `live`、`upcoming` 和 `none`。  
+  - `live`：直播中。  
+  - `upcoming`：即將開播。  
+  - `none`：一般上船影片 or 結束直播的影片。
 - `notifier_types`（通知類型）可設定 Telegram 和 Discord。  
-- `recipient_id` 和 `webhook_url` 可設定多個接收者或 Webhook 連結。  
+- `recipient_ids` 和 `webhook_urls` 可設定多個接收者或 Webhook 連結。  
 - `word_list` 為隨機選取的字詞，會顯示在通知訊息開頭。  
   - 若 `word_list` 為空，則開頭將顯示直播頻道名稱。  
 - `interval` 指每次檢查的間隔時間（以分鐘計算）。  

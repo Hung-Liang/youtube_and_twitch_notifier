@@ -10,71 +10,56 @@ from libs.utils.tools import (
 
 
 def send_notify_by_type(notifier_type, data, title, url, channel_title):
+    def send_with_retry(handler, message, users):
+        for user in users:
+            sent = handler.send_message(user, message)
+            if not sent:
+                message = get_message(
+                    notifier_type, "", url, channel_title, data["word_list"]
+                )
+                sent = handler.send_message(user, message)
+                send_exception_log(
+                    f"[main] {notifier_type.capitalize()} Message Sent Failed"
+                )
 
     message = get_message(
         notifier_type, title, url, channel_title, data["word_list"]
     )
 
     if notifier_type == "telegram":
-        recipients_ids = data["recipient_id"]
-
-        for cid in recipients_ids:
-            sent = TelegramHandler().send_message(cid, message)
-
-            if not sent:
-                message = get_message(
-                    notifier_type, "", url, channel_title, data["word_list"]
-                )
-                sent = TelegramHandler().send_message(cid, message)
-                send_exception_log("[main] Telegram Message Sent Failed")
-
+        users = data["recipient_ids"]
+        handler = TelegramHandler()
     elif notifier_type == "discord":
-        webhook_urls = data["webhook_url"]
+        users = data["webhook_urls"]
+        handler = DiscordHandler()
 
-        for webhook_url in webhook_urls:
-            sent = DiscordHandler(webhook_url).send_message(message)
-
-            if not sent:
-                send_exception_log("[main] Discord Message Sent Failed")
+    send_with_retry(handler, message, users)
 
 
 def send_notify(platform, group):
-
-    if platform == "youtube":
-        channel_ids = group['channel_id']
-
-        for channel_id in channel_ids:
+    def get_results(platform, channel_id, group):
+        if platform == "youtube":
+            broadcast_types = group.get('broadcast_types', ["none", "live"])
             upload_id = get_upload_id(channel_id)
+            return get_live_title_and_url(upload_id, broadcast_types)
 
-            results = get_live_title_and_url(upload_id)
-            # title, url, channel_title = get_live_title_and_url(upload_id)
-
-            if len(results) == 0:
-                continue
-
-            notifier_types = group['notifier_types']
-
-            for result in results:
-                title, url, channel_title = result
-
-                for notifier_type, data in notifier_types.items():
-                    send_notify_by_type(
-                        notifier_type, data, title, url, channel_title
-                    )
-
-    elif platform == "twitch":
-        channel_ids = group['channel_id']
-
-        for channel_id in channel_ids:
-
+        elif platform == "twitch":
             title, url, channel_title = get_twitch_title_and_url(channel_id)
+            return [(title, url, channel_title)] if title else []
 
-            if not title:
-                continue
+        return []
 
-            notifier_types = group['notifier_types']
-
+    def notify_all(results, notifier_types):
+        for title, url, channel_title in results:
             for notifier_type, data in notifier_types.items():
                 send_notify_by_type(
                     notifier_type, data, title, url, channel_title
                 )
+
+    channel_ids = group['channel_ids']
+    notifier_types = group['notifier_types']
+
+    for channel_id in channel_ids:
+        results = get_results(platform, channel_id, group)
+        if results:
+            notify_all(results, notifier_types)

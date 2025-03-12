@@ -130,7 +130,9 @@ def get_upload_id(channel_id):
             return None
 
 
-def get_live_title_and_url(upload_id):
+def get_live_title_and_url(
+    upload_id, broadcast_types=["none", "live"], max_results=3
+):
     """Get Live Title, URL, and Channel Title from the selected channel.
 
     Args:
@@ -140,7 +142,7 @@ def get_live_title_and_url(upload_id):
         tuple: (Live Title, URL, Channel Title) if live,
             else (None, None, None).
     """
-    videos = YoutubeHandler().find_recent_video(upload_id)
+    videos = YoutubeHandler().find_recent_video(upload_id, max_results)
     video_ids = [video["contentDetails"]["videoId"] for video in videos]
 
     ignore_json = Path(IGNORE_PATH, f"{upload_id}.json")
@@ -148,6 +150,8 @@ def get_live_title_and_url(upload_id):
     ignore_list = load_ignore_json(ignore_json)
 
     results = []
+
+    upcoming = 0
 
     for video_id in video_ids:
         if video_id in ignore_list:
@@ -159,7 +163,11 @@ def get_live_title_and_url(upload_id):
         log("[main]", f"video_id: {video_id}")
         log("[main]", f"broadcast_status: {broadcast_status}")
 
-        if broadcast_status in ["none", "live"]:
+        if broadcast_status == "upcoming":
+            upcoming += 1
+            continue
+
+        if broadcast_status in broadcast_types:
             live_title = replace_html_sensitive_symbols(snippet["title"])
             channel_title = replace_html_sensitive_symbols(
                 snippet["channelTitle"]
@@ -168,6 +176,12 @@ def get_live_title_and_url(upload_id):
 
             update_ignore_json(ignore_json, ignore_list, video_id, live_title)
             results.append([live_title, url, channel_title])
+
+    if upcoming == max_results:
+        log("[main]", "All videos are upcoming")
+        return get_live_title_and_url(
+            upload_id, broadcast_types, max_results + 3
+        )
 
     return results
 

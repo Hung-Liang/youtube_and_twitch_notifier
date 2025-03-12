@@ -13,10 +13,10 @@ class DiscordHandler:
         `webhook_url`: Discord webhook url.
     """
 
-    def __init__(self, webhook_url):
-        self.webhook_url = webhook_url
+    def __init__(self):
+        pass
 
-    def send_message(self, msg):
+    def send_message(self, webhook_url, message):
         """Send message to Discord.
 
         Args:
@@ -26,9 +26,9 @@ class DiscordHandler:
             True if success, False if fail.
         """
 
-        url = self.webhook_url
+        url = webhook_url
 
-        res = requests.post(url, json={"content": msg})
+        res = requests.post(url, json={"content": message})
 
         log(
             '[discord_lib]',
