@@ -13,7 +13,7 @@ def schedule_group_jobs(scheduler, platform, group_data):
             send_notify,
             "cron",
             minute=f"0-59/{interval}",
-            args=[platform, config],
+            args=[platform, group, config],
         )
 
 

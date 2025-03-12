@@ -131,7 +131,7 @@ def get_upload_id(channel_id):
 
 
 def get_live_title_and_url(
-    upload_id, broadcast_types=["none", "live"], max_results=3
+    upload_id, group, broadcast_types=["none", "live"], max_results=3
 ):
     """Get Live Title, URL, and Channel Title from the selected channel.
 
@@ -145,7 +145,10 @@ def get_live_title_and_url(
     videos = YoutubeHandler().find_recent_video(upload_id, max_results)
     video_ids = [video["contentDetails"]["videoId"] for video in videos]
 
-    ignore_json = Path(IGNORE_PATH, f"{upload_id}.json")
+    group_path = Path(IGNORE_PATH, group)
+    group_path.mkdir(parents=True, exist_ok=True)
+
+    ignore_json = Path(group_path, f"{upload_id}.json")
 
     ignore_list = load_ignore_json(ignore_json)
 
@@ -175,7 +178,7 @@ def get_live_title_and_url(
             url = f"https://www.youtube.com/watch?v={video_id}"
 
             update_ignore_json(ignore_json, ignore_list, video_id, live_title)
-            results.append([live_title, url, channel_title])
+            results.append((live_title, url, channel_title))
 
     if upcoming == max_results:
         log("[main]", "All videos are upcoming")
@@ -246,20 +249,33 @@ def replace_html_sensitive_symbols(text):
     """Remove HTML Sensitive Symbols from Select Text
 
     Args:
-        `text`: Text
+        text: The input text to be sanitized.
 
     Returns:
-        A Text without HTML Sensitive Symbols
+        str: Text without HTML sensitive symbols.
     """
-    text = (
-        text.replace('%', '%25')
-        .replace('&', '%26')
-        .replace('+', '%2B')
-        .replace('#', '%23')
-        .replace('>', '%3E')
-        .replace('=', '%3D')
-        .replace('<', '%26lt;')
-    )
+    replacements = {
+        '%': '%25',
+        '&': '%26',
+        '+': '%2B',
+        '#': '%23',
+        '>': '%3E',
+        '=': '%3D',
+        '<': '%26lt;',
+        '"': '%22',
+        "'": '%27',
+        '/': '%2F',
+        '(': '%28',
+        ')': '%29',
+        '{': '%7B',
+        '}': '%7D',
+        '[': '%5B',
+        ']': '%5D',
+        '|': '%7C',
+    }
+
+    for symbol, replacement in replacements.items():
+        text = text.replace(symbol, replacement)
 
     return text
 

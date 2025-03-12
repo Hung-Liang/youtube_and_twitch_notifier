@@ -36,12 +36,12 @@ def send_notify_by_type(notifier_type, data, title, url, channel_title):
     send_with_retry(handler, message, users)
 
 
-def send_notify(platform, group):
-    def get_results(platform, channel_id, group):
+def send_notify(platform, group, config):
+    def get_results(platform, channel_id, config):
         if platform == "youtube":
-            broadcast_types = group.get('broadcast_types', ["none", "live"])
+            broadcast_types = config.get('broadcast_types', ["none", "live"])
             upload_id = get_upload_id(channel_id)
-            return get_live_title_and_url(upload_id, broadcast_types)
+            return get_live_title_and_url(upload_id, group, broadcast_types)
 
         elif platform == "twitch":
             title, url, channel_title = get_twitch_title_and_url(channel_id)
@@ -56,10 +56,10 @@ def send_notify(platform, group):
                     notifier_type, data, title, url, channel_title
                 )
 
-    channel_ids = group['channel_ids']
-    notifier_types = group['notifier_types']
+    channel_ids = config['channel_ids']
+    notifier_types = config['notifier_types']
 
     for channel_id in channel_ids:
-        results = get_results(platform, channel_id, group)
+        results = get_results(platform, channel_id, config)
         if results:
             notify_all(results, notifier_types)
