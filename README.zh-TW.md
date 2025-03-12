@@ -13,46 +13,45 @@
 2. 在 `config.py` 檔案中加入以下程式碼：  
 
 ```python
-groups = {
-    "youtube": {
-        "group1": {
-            "interval": 3,
-            "channel_ids": [],
-            "broadcast_types":[],
-            "notifier_types": {
-                "telegram": {
-                    "recipient_ids": [],
-                    "word_list": [],
-                },
-                "discord": {
-                    "webhook_urls": [],
-                    "word_list": [],
-                },
+youtube_groups = {
+    "group1": {
+        "interval": 3,
+        "channel_ids": [],
+        "broadcast_types": [],
+        "notifier_types": {
+            "telegram": {
+                "recipient_ids": [],
+                "word_list": [],
+            },
+            "discord": {
+                "webhook_urls": [],
+                "word_list": [],
             },
         },
     },
-    "twitch": {
-        "group1": {
-            "interval": 3,
-            "channel_ids": [],
-            "notifier_types": {
-                "telegram": {
-                    "recipient_ids": [],
-                    "word_list": [],
-                },
-                "discord": {
-                    "webhook_urls": [],
-                    "word_list": [],
-                },
+}
+
+twitch_groups = {
+    "group1": {
+        "interval": 3,
+        "channel_ids": [],
+        "notifier_types": {
+            "telegram": {
+                "recipient_ids": [],
+                "word_list": [],
             },
-        }
+            "discord": {
+                "webhook_urls": [],
+                "word_list": [],
+            },
+        },
     },
 }
 ```
 
 ### 配置說明
 
-- `youtube` 和 `twitch` 可分別新增多個 `group`（群組）。  
+- `youtube_groups` 和 `twitch_groups` 可分別新增多個 `group`（群組）。  
 - 每個群組內可新增多個 `channel_ids`（頻道 ID）。  
 - `broadcast_types` 只有Youtube會使用到這個參數，可設定 `live`、`upcoming` 和 `none`。  
   - `live`：直播中。  

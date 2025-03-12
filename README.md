@@ -13,46 +13,43 @@
 - In the `config.py` file you need to add the following code:
 
 ```python
-groups = {
-    "youtube": {
-        "group1": {
-            "interval": 3,
-            "channel_ids": [],
-            "broadcast_types":[],
-            "notifier_types": {
-                "telegram": {
-                    "recipient_ids": [],
-                    "word_list": [],
-                },
-                "discord": {
-                    "webhook_urls": [],
-                    "word_list": [],
-                },
+youtube_groups = {
+    "group1": {
+        "interval": 3,
+        "channel_ids": [],
+        "broadcast_types": [],
+        "notifier_types": {
+            "telegram": {
+                "recipient_ids": [],
+                "word_list": [],
+            },
+            "discord": {
+                "webhook_urls": [],
+                "word_list": [],
             },
         },
     },
-    "twitch": {
-        "group1": {
-            "interval": 3,
-            "channel_ids": [],
-            "notifier_types": {
-                "telegram": {
-                    "recipient_ids": [],
-                    "word_list": [],
-                },
-                "discord": {
-                    "webhook_urls": [],
-                    "word_list": [],
-                },
-            },
-        }
-    },
 }
 
-
+twitch_groups = {
+    "group1": {
+        "interval": 3,
+        "channel_ids": [],
+        "notifier_types": {
+            "telegram": {
+                "recipient_ids": [],
+                "word_list": [],
+            },
+            "discord": {
+                "webhook_urls": [],
+                "word_list": [],
+            },
+        },
+    },
+}
 ```
 
-- You can add as many groups under `youtube` and `twitch` as you want.
+- You can add as many groups under `youtube_groups` and `twitch_groups` as you want.
 - You can add as many `channel_ids` as you want under each group.
 - `broadcast_types` is only used for youtube, you can set it to `live`, `upcoming` or `none`.
   - `live`: live stream.

@@ -44,7 +44,9 @@ def send_notify(platform, group, config):
             return get_live_title_and_url(upload_id, group, broadcast_types)
 
         elif platform == "twitch":
-            title, url, channel_title = get_twitch_title_and_url(channel_id)
+            title, url, channel_title = get_twitch_title_and_url(
+                channel_id, group
+            )
             return [(title, url, channel_title)] if title else []
 
         return []

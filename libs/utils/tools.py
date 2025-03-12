@@ -142,7 +142,9 @@ def get_live_title_and_url(
         tuple: (Live Title, URL, Channel Title) if live,
             else (None, None, None).
     """
-    videos = YoutubeHandler().find_recent_video(upload_id, max_results)
+    videos = YoutubeHandler().find_recent_video(
+        upload_id, max_results=max_results
+    )
     video_ids = [video["contentDetails"]["videoId"] for video in videos]
 
     group_path = Path(IGNORE_PATH, group)
@@ -189,11 +191,12 @@ def get_live_title_and_url(
     return results
 
 
-def get_twitch_title_and_url(channel_id):
+def get_twitch_title_and_url(channel_id, group):
     """Get Live Title, URL, and Channel Title from the selected channel.
 
     Args:
         channel_id (str): Channel ID
+        group (str): Group
 
     Returns:
         tuple: (Live Title, URL, Channel Title) if live,
@@ -203,7 +206,10 @@ def get_twitch_title_and_url(channel_id):
     if not stream_info['is_live']:
         return None, None, None
 
-    ignore_json = Path(IGNORE_PATH, f"{channel_id}.json")
+    group_path = Path(IGNORE_PATH, group)
+    group_path.mkdir(parents=True, exist_ok=True)
+
+    ignore_json = Path(group_path, f"{channel_id}.json")
 
     ignore_list = load_ignore_json(ignore_json)
     live_title = replace_html_sensitive_symbols(stream_info['title'])
