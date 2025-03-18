@@ -1,7 +1,9 @@
-import requests
-
-from dotenv import load_dotenv
 import os
+
+import requests
+from dotenv import load_dotenv
+
+from libs.utils.logger import log
 
 load_dotenv()
 
@@ -25,6 +27,8 @@ class TwitchHandler:
 
         if response.status_code == 200:
             data = response.json()
+            log("Twitch Access Token Updated")
+            log(data)
             return data["access_token"]
         else:
             raise Exception(
@@ -46,9 +50,15 @@ class TwitchHandler:
         if response.status_code == 200:
             data = response.json()
             streams = data.get("data", [])
+            log(f"Twitch Stream Info: {streams}")
+            log(data)
             if streams:
-                return {"is_live": True, "title": streams[0]["title"]}
-            return {"is_live": False, "title": None}
+                return {
+                    "is_live": True,
+                    "title": streams[0]["title"],
+                    'stream_id': streams[0]['id'],
+                }
+            return {"is_live": False, "title": None, 'stream_id': None}
         else:
             raise Exception(
                 f"Twitch API Error: {response.status_code} {response.text}"

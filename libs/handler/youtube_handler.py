@@ -1,5 +1,6 @@
 import json
 import os
+import random
 
 import requests
 from dotenv import load_dotenv
@@ -17,7 +18,10 @@ class YoutubeHandler:
     """
 
     def __init__(self):
-        self.token = os.environ.get("youtube_api_token")
+        # self.token = os.environ.get("youtube_api_token")
+        self.token = random.choice(
+            os.environ.get("youtube_api_token").split(",")
+        )
 
     def get_upload_playlist_id(self, channel_id):
         """Get upload playlist id from Youtube.

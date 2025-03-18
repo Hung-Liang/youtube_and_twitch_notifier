@@ -212,12 +212,14 @@ def get_twitch_title_and_url(channel_id, group):
     ignore_json = Path(group_path, f"{channel_id}.json")
 
     ignore_list = load_ignore_json(ignore_json)
-    live_title = replace_html_sensitive_symbols(stream_info['title'])
+    stream_id = stream_info['stream_id']
 
-    if ignore_list.get(channel_id) == live_title:
+    if stream_id in ignore_list:
         return None, None, None
 
-    update_ignore_json(ignore_json, ignore_list, channel_id, live_title)
+    live_title = replace_html_sensitive_symbols(stream_info['title'])
+    update_ignore_json(ignore_json, ignore_list, stream_id, live_title)
+
     return live_title, f"https://www.twitch.tv/{channel_id}", channel_id
 
 
