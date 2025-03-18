@@ -56,9 +56,37 @@ class TwitchHandler:
                 return {
                     "is_live": True,
                     "title": streams[0]["title"],
-                    'stream_id': streams[0]['id'],
+                    "stream_id": streams[0]["id"],
                 }
             return {"is_live": False, "title": None, 'stream_id': None}
+        else:
+            raise Exception(
+                f"Twitch API Error: {response.status_code} {response.text}"
+            )
+
+    def get_stream_infos(self, usernames: list):
+        url = f"{self.base_url}streams"
+        params = {"user_login": usernames}
+        response = requests.get(url, headers=self.headers, params=params)
+
+        if response.status_code == 200:
+            data = response.json()
+            streams = data.get("data", [])
+            log(f"Twitch Stream Info: {streams}")
+            log(data)
+
+            stream_infos = []
+
+            for stream in streams:
+                stream_infos.append(
+                    {
+                        "is_live": True,
+                        "title": stream["title"],
+                        "stream_id": stream["id"],
+                        "user_login": stream["user_login"],
+                    }
+                )
+            return stream_infos
         else:
             raise Exception(
                 f"Twitch API Error: {response.status_code} {response.text}"
