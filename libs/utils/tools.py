@@ -271,6 +271,8 @@ def get_multiple_twitch_title_and_url(channel_ids, group):
 
         results.append((live_title, url, channel_title))
 
+    return results
+
 
 def get_twitch_title_and_url(channel_id, group):
     """Get Live Title, URL, and Channel Title from the selected channel.
