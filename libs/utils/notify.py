@@ -47,7 +47,7 @@ def send_notify(platform, group, config):
             )
 
         elif platform == "twitch":
-            return get_multiple_twitch_title_and_url
+            return get_multiple_twitch_title_and_url(channel_ids, group)
 
         return []
 
