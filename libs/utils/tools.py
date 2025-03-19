@@ -130,6 +130,49 @@ def get_upload_id(channel_id):
             return None
 
 
+def get_multiple_upload_id(channel_ids):
+    """Get Multiple Upload Playlist ID from Select Channels
+
+    Args:
+        `channel_ids`: Channel IDs
+
+    Returns:
+        A Multiple Upload Playlist ID of Select Channels
+    """
+    upload_ids = {}
+
+    for channel_id in channel_ids:
+        upload_id = get_upload_id(channel_id)
+        if upload_id:
+            upload_ids[channel_id] = upload_id
+
+    return upload_ids
+
+
+def get_multiple_live_title_and_url(upload_ids, broadcast_types, group):
+    """Get Multiple Live Title, URL, and Channel Title from Select Channels
+
+    Args:
+        `upload_ids`: Upload Playlist IDs
+        `broadcast_types`: Broadcast Types
+        `group`: Group
+
+    Returns:
+        A Multiple Live Title, URL, and Channel Title from Select Channels
+    """
+    results = []
+
+    for channel_id, upload_id in upload_ids.items():
+        live_title_and_url = get_live_title_and_url(
+            upload_id, group, broadcast_types
+        )
+
+        if live_title_and_url:
+            results.extend(live_title_and_url)
+
+    return results
+
+
 def get_live_title_and_url(
     upload_id, group, broadcast_types=["none", "live"], max_results=3
 ):
@@ -189,6 +232,44 @@ def get_live_title_and_url(
         )
 
     return results
+
+
+def get_multiple_twitch_title_and_url(channel_ids, group):
+    """Get Multiple Live Title, URL, and Channel Title from Select Channels
+
+    Args:
+        `channel_ids`: Channel IDs
+        `group`: Group
+
+    Returns:
+        A Multiple Live Title, URL, and Channel Title from Select Channels
+    """
+    stream_infos = TwitchHandler().get_stream_infos(channel_ids)
+
+    if not stream_infos:
+        return []
+
+    results = []
+
+    group_path = Path(IGNORE_PATH, group)
+    group_path.mkdir(parents=True, exist_ok=True)
+
+    for stream_info in stream_infos:
+        live_title = replace_html_sensitive_symbols(stream_info['title'])
+        stream_id = stream_info['stream_id']
+        channel_title = stream_info['user_login']
+
+        ignore_json = Path(group_path, f"{channel_title}.json")
+        ignore_list = load_ignore_json(ignore_json)
+
+        if stream_id in ignore_list:
+            continue
+
+        update_ignore_json(ignore_json, ignore_list, stream_id, live_title)
+
+        url = f"https://www.twitch.tv/{channel_title}"
+
+        results.append((live_title, url, channel_title))
 
 
 def get_twitch_title_and_url(channel_id, group):

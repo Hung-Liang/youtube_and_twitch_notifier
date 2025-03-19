@@ -1,10 +1,10 @@
 from libs.handler.discord_handler import DiscordHandler
 from libs.handler.telegram_handler import TelegramHandler
 from libs.utils.tools import (
-    get_live_title_and_url,
     get_message,
-    get_twitch_title_and_url,
-    get_upload_id,
+    get_multiple_live_title_and_url,
+    get_multiple_twitch_title_and_url,
+    get_multiple_upload_id,
     send_exception_log,
 )
 
@@ -37,17 +37,17 @@ def send_notify_by_type(notifier_type, data, title, url, channel_title):
 
 
 def send_notify(platform, group, config):
-    def get_results(platform, channel_id, config):
+    def get_results(platform, channel_ids, config):
+
         if platform == "youtube":
             broadcast_types = config.get('broadcast_types', ["none", "live"])
-            upload_id = get_upload_id(channel_id)
-            return get_live_title_and_url(upload_id, group, broadcast_types)
+            upload_ids = get_multiple_upload_id(channel_ids)
+            return get_multiple_live_title_and_url(
+                upload_ids, broadcast_types, group
+            )
 
         elif platform == "twitch":
-            title, url, channel_title = get_twitch_title_and_url(
-                channel_id, group
-            )
-            return [(title, url, channel_title)] if title else []
+            return get_multiple_twitch_title_and_url
 
         return []
 
@@ -61,7 +61,6 @@ def send_notify(platform, group, config):
     channel_ids = config['channel_ids']
     notifier_types = config['notifier_types']
 
-    for channel_id in channel_ids:
-        results = get_results(platform, channel_id, config)
-        if results:
-            notify_all(results, notifier_types)
+    results = get_results(platform, channel_ids, config)
+    if results:
+        notify_all(results, notifier_types)
