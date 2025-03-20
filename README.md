@@ -98,8 +98,8 @@ twitch_client_secret=""
 
 ## Todo
 
-- Add more notifier types.
-- Issue when a channel id in config in different group will cause second group to not work.
+- [ ] Add more notifier types.
+- [x] ~~Issue when a channel id in config in different group will cause second group to not work.~~
 
 ## Support me
 
