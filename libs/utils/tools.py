@@ -65,7 +65,7 @@ def get_message(notifier_type, title, url, channel_title, word_list):
     if notifier_type == "telegram":
         message = "<b>{}\n{}\n{}</b>".format(random_word, title, url)
     elif notifier_type == "discord":
-        message = "@everyone\n{}\n\n[{}]({})".format(random_word, title, url)
+        message = "{}\n\n[{}]({})".format(random_word, title, url)
 
     return message
 
@@ -258,6 +258,7 @@ def get_multiple_twitch_title_and_url(channel_ids, group):
         live_title = replace_html_sensitive_symbols(stream_info['title'])
         stream_id = stream_info['stream_id']
         channel_title = stream_info['user_login']
+        user_name = stream_info['user_name']
 
         ignore_json = Path(group_path, f"{channel_title}.json")
         ignore_list = load_ignore_json(ignore_json)
@@ -269,7 +270,7 @@ def get_multiple_twitch_title_and_url(channel_ids, group):
 
         url = f"https://www.twitch.tv/{channel_title}"
 
-        results.append((live_title, url, channel_title))
+        results.append((live_title, url, user_name))
 
     return results
 

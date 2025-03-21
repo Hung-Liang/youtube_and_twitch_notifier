@@ -84,6 +84,7 @@ class TwitchHandler:
                         "title": stream["title"],
                         "stream_id": stream["id"],
                         "user_login": stream["user_login"],
+                        "user_name": stream["user_name"],
                     }
                 )
             return stream_infos
