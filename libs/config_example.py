@@ -3,6 +3,7 @@ youtube_groups = {
         "interval": 3,
         "channel_ids": [],
         "broadcast_types": [],
+        "notify_member_only": False,  # Notify member-only streams
         "notifier_types": {
             "telegram": {
                 "recipient_ids": [],

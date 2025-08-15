@@ -130,11 +130,24 @@ def get_upload_id(channel_id):
             return None
 
 
-def get_multiple_upload_id(channel_ids):
+def get_member_only_id(channel_id):
+    """Get Member-Only Playlist ID from Select Channel
+
+    Args:
+        `channel_id`: Channel ID
+
+    Returns:
+        A Member-Only Playlist ID of Select Channel
+    """
+    return YoutubeHandler().get_member_only_playlist_id(channel_id)
+
+
+def get_multiple_upload_id(channel_ids, include_member_only=False):
     """Get Multiple Upload Playlist ID from Select Channels
 
     Args:
         `channel_ids`: Channel IDs
+        `include_member_only`: Whether to include member-only playlists
 
     Returns:
         A Multiple Upload Playlist ID of Select Channels
@@ -142,9 +155,16 @@ def get_multiple_upload_id(channel_ids):
     upload_ids = {}
 
     for channel_id in channel_ids:
+        # Get regular upload playlist
         upload_id = get_upload_id(channel_id)
         if upload_id:
             upload_ids[channel_id] = upload_id
+
+        # Get member-only playlist if requested
+        if include_member_only:
+            member_only_id = get_member_only_id(channel_id)
+            if member_only_id:
+                upload_ids[f"{channel_id}_member"] = member_only_id
 
     return upload_ids
 
@@ -162,9 +182,22 @@ def get_multiple_live_title_and_url(upload_ids, broadcast_types, group):
     """
     results = []
 
-    for channel_id, upload_id in upload_ids.items():
+    for channel_key, upload_id in upload_ids.items():
+        # Check if this is a member-only playlist
+        is_member_only = channel_key.endswith("_member")
+
+        # Extract the original channel_id (remove _member suffix if present)
+        original_channel_id = (
+            channel_key[:-7] if is_member_only else channel_key
+        )
+
         live_title_and_url = get_live_title_and_url(
-            upload_id, group, broadcast_types
+            upload_id,
+            group,
+            broadcast_types,
+            3,
+            is_member_only,
+            original_channel_id,
         )
 
         if live_title_and_url:
@@ -174,12 +207,22 @@ def get_multiple_live_title_and_url(upload_ids, broadcast_types, group):
 
 
 def get_live_title_and_url(
-    upload_id, group, broadcast_types=["none", "live"], max_results=3
+    upload_id,
+    group,
+    broadcast_types=["none", "live"],
+    max_results=3,
+    is_member_only=False,
+    channel_id=None,
 ):
     """Get Live Title, URL, and Channel Title from the selected channel.
 
     Args:
         upload_id (str): Upload Playlist ID of the selected channel.
+        group (str): Group name.
+        broadcast_types (list): Broadcast types to check.
+        max_results (int): Maximum results to fetch.
+        is_member_only (bool): Whether this is a member-only playlist.
+        channel_id (str): Original channel ID for shared ignore tracking.
 
     Returns:
         tuple: (Live Title, URL, Channel Title) if live,
@@ -188,12 +231,19 @@ def get_live_title_and_url(
     videos = YoutubeHandler().find_recent_video(
         upload_id, max_results=max_results
     )
+    if not videos:
+        log("[main]", f"No videos found for upload_id: {upload_id}")
+        return []
     video_ids = [video["contentDetails"]["videoId"] for video in videos]
 
     group_path = Path(IGNORE_PATH, group)
     group_path.mkdir(parents=True, exist_ok=True)
 
-    ignore_json = Path(group_path, f"{upload_id}.json")
+    if channel_id:
+        ignore_json = Path(group_path, f"{channel_id}.json")
+        # migrate_playlist_ignore_to_channel(group, channel_id, upload_id)
+    else:
+        ignore_json = Path(group_path, f"{upload_id}.json")
 
     ignore_list = load_ignore_json(ignore_json)
 
@@ -217,6 +267,10 @@ def get_live_title_and_url(
 
         if broadcast_status in broadcast_types:
             live_title = replace_html_sensitive_symbols(snippet["title"])
+
+            if is_member_only:
+                live_title = "【Member Only】\n" + live_title
+
             channel_title = replace_html_sensitive_symbols(
                 snippet["channelTitle"]
             )
@@ -228,7 +282,12 @@ def get_live_title_and_url(
     if upcoming == max_results:
         log("[main]", "All videos are upcoming")
         return get_live_title_and_url(
-            upload_id, broadcast_types, max_results + 3
+            upload_id,
+            group,
+            broadcast_types,
+            max_results + 3,
+            is_member_only,
+            channel_id,
         )
 
     return results
@@ -370,6 +429,28 @@ def replace_html_sensitive_symbols(text):
         text = text.replace(symbol, replacement)
 
     return text
+
+
+def migrate_playlist_ignore_to_channel(group, channel_id, upload_id):
+    """Migrate playlist-based ignore files to channel-based ignore files.
+
+    Args:
+        group (str): Group name.
+        channel_id (str): Channel ID.
+        upload_id (str): Upload playlist ID.
+    """
+    group_path = Path(IGNORE_PATH, group)
+
+    old_ignore_json = Path(group_path, f"{upload_id}.json")
+    new_ignore_json = Path(group_path, f"{channel_id}.json")
+
+    # If old file exists and new file doesn't exist, migrate
+    if old_ignore_json.exists() and not new_ignore_json.exists():
+        old_ignore_list = load_ignore_json(old_ignore_json)
+        save_json(new_ignore_json, old_ignore_list)
+
+        # Optionally remove old file after migration
+        # old_ignore_json.unlink()  # Uncomment if you want to delete old files
 
 
 def create_empty_json(json_path):
