@@ -3,7 +3,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 
 from libs.config import youtube_groups, twitch_groups
 from libs.utils.notify import send_notify
-from libs.utils.tools import send_daily_log
+from libs.utils.tools import send_daily_log, send_service_start_notification
 
 
 def schedule_group_jobs(scheduler, platform, group_data):
@@ -16,6 +16,8 @@ def schedule_group_jobs(scheduler, platform, group_data):
             args=[platform, group, config],
         )
 
+
+send_service_start_notification()
 
 timezone = pytz.timezone("Asia/Taipei")
 scheduler = BlockingScheduler(timezone=timezone)

@@ -70,6 +70,14 @@ def get_message(notifier_type, title, url, channel_title, word_list):
     return message
 
 
+def send_service_start_notification():
+    """Send Service Start Notification to Telegram Admin"""
+
+    message = "🚀 <b>Service Started</b>"
+
+    TelegramHandler().send_message(TELEGRAM_ADMIN_ID, message)
+
+
 def send_daily_log():
     """Send Daily Log to Telegram Admin"""
 
