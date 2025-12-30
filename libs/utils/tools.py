@@ -142,11 +142,9 @@ def get_multiple_upload_id(channel_ids):
     upload_ids = {}
 
     for channel_id in channel_ids:
-        member_only_id = "UUMO" + channel_id[2:]
-        upload_ids[channel_id] = [member_only_id]
         upload_id = get_upload_id(channel_id)
         if upload_id:
-            upload_ids[channel_id].append(upload_id)
+            upload_ids[channel_id] = upload_id
 
     return upload_ids
 
@@ -165,13 +163,12 @@ def get_multiple_live_title_and_url(upload_ids, broadcast_types, group):
     results = []
 
     for channel_id, upload_id in upload_ids.items():
-        for upload in upload_id:
-            live_title_and_url = get_live_title_and_url(
-                upload, group, broadcast_types
-            )
+        live_title_and_url = get_live_title_and_url(
+            upload_id, group, broadcast_types
+        )
 
-            if live_title_and_url:
-                results.extend(live_title_and_url)
+        if live_title_and_url:
+            results.extend(live_title_and_url)
 
     return results
 
@@ -191,9 +188,6 @@ def get_live_title_and_url(
     videos = YoutubeHandler().find_recent_video(
         upload_id, max_results=max_results
     )
-    if not videos:
-        log("[main]", f"No videos found for upload_id: {upload_id}")
-        return []
     video_ids = [video["contentDetails"]["videoId"] for video in videos]
 
     group_path = Path(IGNORE_PATH, group)
