@@ -41,7 +41,10 @@ def send_notify(platform, group, config):
 
         if platform == "youtube":
             broadcast_types = config.get('broadcast_types', ["none", "live"])
-            upload_ids = get_multiple_upload_id(channel_ids)
+            notify_member_only = config.get('notify_member_only', False)
+            upload_ids = get_multiple_upload_id(
+                channel_ids, notify_member_only
+            )
             return get_multiple_live_title_and_url(
                 upload_ids, broadcast_types, group
             )

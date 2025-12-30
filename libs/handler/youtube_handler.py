@@ -53,6 +53,20 @@ class YoutubeHandler:
         else:
             return None
 
+    def get_member_only_playlist_id(self, channel_id):
+        """Get member-only playlist id from Youtube channel.
+
+        Args:
+            `channel_id`: Channel ID (e.g., "UC1234567890123456789")
+
+        Returns:
+            Member-only playlist id (e.g., "UUMO1234567890123456789")
+        """
+        if channel_id.startswith("UC"):
+            return "UUMO" + channel_id[2:]
+        else:
+            return None
+
     def find_recent_video(
         self, playlist_id, part="contentDetails", max_results=3
     ):
