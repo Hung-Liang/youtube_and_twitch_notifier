@@ -20,7 +20,6 @@ class TelegramHandler:
     Functions:
         `send_message`: Send message to Telegram.
         `send_document`: Send document to Telegram.
-        `send_document_by_fid`: Send document by file id to Telegram.
     """
 
     def __init__(self):
@@ -85,31 +84,3 @@ class TelegramHandler:
             return True, json.loads(res.text)
         else:
             return False, json.loads(res.text)
-
-    def send_document_by_fid(self, cid, fid):
-        """Send document by file id to Telegram.
-
-        Args:
-            `cid`: Chat ID.
-            `fid`: File ID.
-
-        Returns:
-            True if success, False if fail.
-        """
-
-        url = (
-            'https://api.telegram.org/bot{}'
-            '/sendDocument?chat_id={}&document={}'.format(self.token, cid, fid)
-        )
-
-        res = requests.post(url, timeout=REQUEST_TIMEOUT)
-
-        log(
-            '[telegram_lib]',
-            f'send document by fid: {res.status_code} {res.text}',
-        )
-
-        if res.status_code == 200:
-            return True
-        else:
-            return False

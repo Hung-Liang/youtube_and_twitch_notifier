@@ -136,34 +136,3 @@ class YoutubeHandler:
             return json.loads(res.text)
         else:
             return None
-
-    def get_channel_info(self, channel_id, event_type="live", part="snippet"):
-        """Get channel info from Youtube.
-
-        Args:
-            `channel_id`: Channel ID.
-            `event_type`: Event type.
-            `part`: Part to get.
-
-        Returns:
-            Channel info.
-        """
-
-        url = (
-            "https://www.googleapis.com/youtube/v3/search?"
-            "part={}&channelId={}&eventType={}&type=video".format(
-                part, channel_id, event_type
-            )
-        )
-
-        res = requests.get(url, headers=self.headers, timeout=REQUEST_TIMEOUT)
-
-        log(
-            '[youtube_lib]',
-            f'get channel info: {res.status_code} {res.text}',
-        )
-
-        if res.status_code == 200:
-            return json.loads(res.text)
-        else:
-            return None
