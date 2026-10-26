@@ -1,7 +1,10 @@
 import json
 import os
 import random
+import threading
+from datetime import datetime
 
+import pytz
 import requests
 from dotenv import load_dotenv
 
@@ -11,12 +14,35 @@ load_dotenv()
 
 REQUEST_TIMEOUT = 10
 
+# YouTube daily quota resets at midnight Pacific Time
+QUOTA_TIMEZONE = pytz.timezone("America/Los_Angeles")
+QUOTA_ERROR_REASONS = ("quotaExceeded", "dailyLimitExceeded")
+
+# Shared across instances: key -> quota day it ran out
+_exhausted_keys = {}
+_quota_alert_day = None
+_quota_lock = threading.Lock()
+
+
+def get_quota_day():
+    return datetime.now(QUOTA_TIMEZONE).date()
+
+
+def is_quota_exceeded(res):
+    if res.status_code != 403:
+        return False
+    try:
+        errors = res.json().get("error", {}).get("errors", [])
+    except ValueError:
+        return False
+    return any(error.get("reason") in QUOTA_ERROR_REASONS for error in errors)
+
 
 class YoutubeHandler:
     """Youtube Handler
 
     Attributes:
-        `token`: Youtube api 3 Token.
+        `tokens`: Youtube api 3 Tokens.
     """
 
     def __init__(self):
@@ -25,9 +51,62 @@ class YoutubeHandler:
         if not tokens:
             raise ValueError("youtube_api_token is not set in .env")
 
-        self.token = random.choice(tokens.split(","))
-        # Pass the key via header so it never appears in URLs or tracebacks
-        self.headers = {"X-goog-api-key": self.token}
+        # Random order spreads usage across keys
+        self.tokens = tokens.split(",")
+        random.shuffle(self.tokens)
+
+    def request(self, url):
+        """GET from Youtube, switching keys when a key runs out of quota.
+
+        Args:
+            `url`: Request url without api key.
+
+        Returns:
+            The last response.
+        """
+        global _quota_alert_day
+
+        today = get_quota_day()
+        with _quota_lock:
+            tokens = [
+                token
+                for token in self.tokens
+                if _exhausted_keys.get(token) != today
+            ]
+        # Every key ran out earlier today, try them again in case of reset
+        if not tokens:
+            tokens = self.tokens
+
+        for index, token in enumerate(tokens):
+            # Pass the key via header so it never appears in URLs or tracebacks
+            res = requests.get(
+                url,
+                headers={"X-goog-api-key": token},
+                timeout=REQUEST_TIMEOUT,
+            )
+            if not is_quota_exceeded(res):
+                return res
+
+            with _quota_lock:
+                _exhausted_keys[token] = today
+            log(
+                '[youtube_lib]',
+                f'api key quota exceeded, {len(tokens) - index - 1} left',
+            )
+
+        with _quota_lock:
+            should_alert = _quota_alert_day != today
+            _quota_alert_day = today
+
+        if should_alert:
+            # Imported here to avoid a circular import with tools
+            from libs.utils.tools import send_exception_log
+
+            send_exception_log(
+                "[youtube_lib] All youtube api keys are out of quota"
+            )
+
+        return res
 
     def get_upload_playlist_id(self, channel_id):
         """Get upload playlist id from Youtube.
@@ -45,7 +124,7 @@ class YoutubeHandler:
             "id={}&part=contentDetails".format(channel_id)
         )
 
-        res = requests.get(url, headers=self.headers, timeout=REQUEST_TIMEOUT)
+        res = self.request(url)
 
         log(
             '[youtube_lib]',
@@ -97,7 +176,7 @@ class YoutubeHandler:
             )
         )
 
-        res = requests.get(url, headers=self.headers, timeout=REQUEST_TIMEOUT)
+        res = self.request(url)
 
         log(
             '[youtube_lib]',
@@ -125,7 +204,7 @@ class YoutubeHandler:
             "part={}&id={}".format(part, video_id)
         )
 
-        res = requests.get(url, headers=self.headers, timeout=REQUEST_TIMEOUT)
+        res = self.request(url)
 
         log(
             '[youtube_lib]',
