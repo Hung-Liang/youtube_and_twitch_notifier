@@ -32,7 +32,6 @@ class TwitchHandler:
         if response.status_code == 200:
             data = response.json()
             log("Twitch Access Token Updated")
-            log(data)
             return data["access_token"]
         else:
             raise Exception(

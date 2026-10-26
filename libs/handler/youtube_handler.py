@@ -24,6 +24,8 @@ class YoutubeHandler:
         self.token = random.choice(
             os.environ.get("youtube_api_token").split(",")
         )
+        # Pass the key via header so it never appears in URLs or tracebacks
+        self.headers = {"X-goog-api-key": self.token}
 
     def get_upload_playlist_id(self, channel_id):
         """Get upload playlist id from Youtube.
@@ -38,10 +40,10 @@ class YoutubeHandler:
 
         url = (
             "https://www.googleapis.com/youtube/v3/channels?"
-            "id={}&key={}&part=contentDetails".format(channel_id, self.token)
+            "id={}&part=contentDetails".format(channel_id)
         )
 
-        res = requests.get(url, timeout=REQUEST_TIMEOUT)
+        res = requests.get(url, headers=self.headers, timeout=REQUEST_TIMEOUT)
 
         log(
             '[youtube_lib]',
@@ -88,17 +90,13 @@ class YoutubeHandler:
 
         url = (
             "https://www.googleapis.com/youtube/v3/playlistItems?"
-            "part={}&maxResults={}&playlistId={}&key={}".format(
-                part, max_results, playlist_id, self.token
+            "part={}&maxResults={}&playlistId={}".format(
+                part, max_results, playlist_id
             )
         )
 
-        res = requests.get(url, timeout=REQUEST_TIMEOUT)
+        res = requests.get(url, headers=self.headers, timeout=REQUEST_TIMEOUT)
 
-        log(
-            '[youtube_lib]',
-            f'find recent video: {url}',
-        )
         log(
             '[youtube_lib]',
             f'find recent video: {res.status_code} {res.text}',
@@ -122,10 +120,10 @@ class YoutubeHandler:
 
         url = (
             "https://www.googleapis.com/youtube/v3/videos?"
-            "part={}&id={}&key={}".format(part, video_id, self.token)
+            "part={}&id={}".format(part, video_id)
         )
 
-        res = requests.get(url, timeout=REQUEST_TIMEOUT)
+        res = requests.get(url, headers=self.headers, timeout=REQUEST_TIMEOUT)
 
         log(
             '[youtube_lib]',
@@ -151,12 +149,12 @@ class YoutubeHandler:
 
         url = (
             "https://www.googleapis.com/youtube/v3/search?"
-            "part={}&channelId={}&eventType={}&type=video&key={}".format(
-                part, channel_id, event_type, self.token
+            "part={}&channelId={}&eventType={}&type=video".format(
+                part, channel_id, event_type
             )
         )
 
-        res = requests.get(url, timeout=REQUEST_TIMEOUT)
+        res = requests.get(url, headers=self.headers, timeout=REQUEST_TIMEOUT)
 
         log(
             '[youtube_lib]',
