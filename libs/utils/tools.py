@@ -264,6 +264,10 @@ def get_live_title_and_url(
             continue
 
         video_info = YoutubeHandler().get_video_info(video_id)
+        if not video_info or not video_info.get("items"):
+            log("[main]", f"No video info found for video_id: {video_id}")
+            continue
+
         snippet = video_info["items"][0]["snippet"]
         broadcast_status = snippet.get("liveBroadcastContent", "")
         log("[main]", f"video_id: {video_id}")

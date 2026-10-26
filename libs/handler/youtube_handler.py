@@ -48,12 +48,15 @@ class YoutubeHandler:
             f'get upload playlist id: {res.status_code} {res.text}',
         )
 
-        if res.status_code == 200:
-            return json.loads(res.text)["items"][0]["contentDetails"][
-                "relatedPlaylists"
-            ]["uploads"]
-        else:
+        if res.status_code != 200:
             return None
+
+        items = json.loads(res.text).get("items", [])
+        if not items:
+            log('[youtube_lib]', f'channel not found: {channel_id}')
+            return None
+
+        return items[0]["contentDetails"]["relatedPlaylists"]["uploads"]
 
     def get_member_only_playlist_id(self, channel_id):
         """Get member-only playlist id from Youtube channel.
