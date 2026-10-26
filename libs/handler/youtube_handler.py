@@ -111,7 +111,7 @@ class YoutubeHandler:
         """Get video info from Youtube.
 
         Args:
-            `video_id`: Video ID.
+            `video_id`: Video ID, or comma-separated IDs (max 50).
             `part`: Part to get.
 
         Returns:

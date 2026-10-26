@@ -239,6 +239,7 @@ def get_live_title_and_url(
     max_results=3,
     is_member_only=False,
     channel_id=None,
+    video_info_cache=None,
 ):
     """Get Live Title, URL, and Channel Title from the selected channel.
 
@@ -249,6 +250,7 @@ def get_live_title_and_url(
         max_results (int): Maximum results to fetch.
         is_member_only (bool): Whether this is a member-only playlist.
         channel_id (str): Original channel ID for shared ignore tracking.
+        video_info_cache (dict): Video info already fetched, keyed by ID.
 
     Returns:
         tuple: (Live Title, URL, Channel Title) if live,
@@ -272,6 +274,20 @@ def get_live_title_and_url(
 
     ignore_list = load_ignore_json(ignore_json)
 
+    if video_info_cache is None:
+        video_info_cache = {}
+
+    # Fetch all uncached videos in one request to save quota
+    missing_ids = [
+        video_id
+        for video_id in video_ids
+        if video_id not in ignore_list and video_id not in video_info_cache
+    ]
+    if missing_ids:
+        video_info = YoutubeHandler().get_video_info(",".join(missing_ids))
+        for item in (video_info or {}).get("items", []):
+            video_info_cache[item["id"]] = item
+
     results = []
 
     upcoming = 0
@@ -280,12 +296,11 @@ def get_live_title_and_url(
         if video_id in ignore_list:
             continue
 
-        video_info = YoutubeHandler().get_video_info(video_id)
-        if not video_info or not video_info.get("items"):
+        if video_id not in video_info_cache:
             log("[main]", f"No video info found for video_id: {video_id}")
             continue
 
-        snippet = video_info["items"][0]["snippet"]
+        snippet = video_info_cache[video_id]["snippet"]
         broadcast_status = snippet.get("liveBroadcastContent", "")
         log("[main]", f"video_id: {video_id}")
         log("[main]", f"broadcast_status: {broadcast_status}")
@@ -315,6 +330,7 @@ def get_live_title_and_url(
             max_results + 3,
             is_member_only,
             channel_id,
+            video_info_cache,
         )
 
     return results
