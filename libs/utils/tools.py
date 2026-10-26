@@ -315,6 +315,10 @@ def get_multiple_twitch_title_and_url(channel_ids, group):
     Returns:
         A Multiple Live Title, URL, and Channel Title from Select Channels
     """
+    # Helix returns top live streams when user_login is omitted
+    if not channel_ids:
+        return []
+
     stream_infos = TwitchHandler().get_stream_infos(channel_ids)
 
     if not stream_infos:
