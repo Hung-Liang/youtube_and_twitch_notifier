@@ -24,8 +24,11 @@ def schedule_group_jobs(scheduler, platform, group_data):
 
 
 def on_job_error(event):
+    # Keep the traceback in the local log; Telegram gets the exception text only
+    log("[scheduler]", f"Job {event.job_id} traceback\n{event.traceback}")
     send_exception_log(
-        f"[scheduler] Job {event.job_id} failed\n{event.traceback}"
+        f"[scheduler] Job {event.job_id} failed\n"
+        f"{type(event.exception).__name__}: {event.exception}"
     )
 
 

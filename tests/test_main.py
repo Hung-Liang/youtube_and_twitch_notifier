@@ -43,3 +43,21 @@ def test_check_config_logs_warnings(monkeypatch, capsys):
     main.check_config()
 
     assert "does not divide 60" in capsys.readouterr().out
+
+
+def test_job_error_sends_exception_text_only(monkeypatch):
+    logged, sent = [], []
+    monkeypatch.setattr(main, "log", lambda *m, **kw: logged.append(m))
+    monkeypatch.setattr(main, "send_exception_log", sent.append)
+
+    class Event:
+        job_id = "abc"
+        exception = ConnectionError("Connection reset")
+        traceback = 'File "x.py", line 1, in f\n'
+
+    main.on_job_error(Event())
+
+    assert sent == [
+        "[scheduler] Job abc failed\nConnectionError: Connection reset"
+    ]
+    assert 'File "x.py"' in logged[0][1]
