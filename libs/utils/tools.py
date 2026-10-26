@@ -5,6 +5,7 @@ import random
 import threading
 from pathlib import Path
 
+import requests
 from dotenv import load_dotenv
 
 from libs.handler.telegram_handler import TelegramHandler
@@ -122,9 +123,13 @@ def send_exception_log(e):
     log("=" * 80)
 
     log_path = Path(LOG_PATH, filename)
-    TelegramHandler().send_document(
-        TELEGRAM_ADMIN_ID, log_path, "[Exception] " + filename
-    )
+    # Upload failure must not abort the caller's notification job
+    try:
+        TelegramHandler().send_document(
+            TELEGRAM_ADMIN_ID, log_path, "[Exception] " + filename
+        )
+    except requests.RequestException as err:
+        log("[main]", f"Send exception log failed: {err!r}")
 
 
 def get_upload_id(channel_id):
