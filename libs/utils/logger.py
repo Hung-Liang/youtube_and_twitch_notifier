@@ -18,6 +18,8 @@ def log(*messages, console: bool = False, return_filename: bool = False):
 
     Args:
         `messages`: Logging message.
+        `console`: Also print messages to stdout.
+        `return_filename`: Return the log filename written to.
     """
 
     filename = get_log_filename()
@@ -29,7 +31,7 @@ def log(*messages, console: bool = False, return_filename: bool = False):
         print(now, *messages, file=f)
 
     if console:
-        print(messages)
+        print(*messages)
 
     if return_filename:
         return filename

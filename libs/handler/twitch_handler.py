@@ -43,7 +43,7 @@ class TwitchHandler:
 
             if response.status_code == 200:
                 data = response.json()
-                log("Twitch Access Token Updated")
+                log("[twitch_lib]", "access token updated")
                 _access_token = data["access_token"]
                 return _access_token
             else:
@@ -78,8 +78,10 @@ class TwitchHandler:
         if response.status_code == 200:
             data = response.json()
             streams = data.get("data", [])
-            log(f"Twitch Stream Info: {streams}")
-            log(data)
+            log(
+                "[twitch_lib]",
+                f"get stream infos: {response.status_code} {data}",
+            )
 
             stream_infos = []
 

@@ -307,8 +307,10 @@ def get_live_title_and_url(
 
         snippet = video_info_cache[video_id]["snippet"]
         broadcast_status = snippet.get("liveBroadcastContent", "")
-        log("[main]", f"video_id: {video_id}")
-        log("[main]", f"broadcast_status: {broadcast_status}")
+        log(
+            "[main]",
+            f"video_id: {video_id}, broadcast_status: {broadcast_status}",
+        )
 
         if broadcast_status == "upcoming":
             upcoming += 1
