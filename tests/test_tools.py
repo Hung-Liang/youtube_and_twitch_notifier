@@ -78,11 +78,15 @@ def test_live_video_is_returned_once(monkeypatch):
     )
 
     first = tools.get_live_title_and_url("UU1", "g", ["live"])
-    second = tools.get_live_title_and_url("UU1", "g", ["live"])
+    assert [r[:3] for r in first] == [
+        ("title", "https://www.youtube.com/watch?v=v1", "channel")
+    ]
 
-    assert first == [("title", "https://www.youtube.com/watch?v=v1",
-                      "channel")]
-    assert second == []
+    # Not marked yet, so it is returned again
+    assert len(tools.get_live_title_and_url("UU1", "g", ["live"])) == 1
+
+    first[0][3]()
+    assert tools.get_live_title_and_url("UU1", "g", ["live"]) == []
 
 
 def test_all_upcoming_fetches_more_videos(monkeypatch):
@@ -93,6 +97,16 @@ def test_all_upcoming_fetches_more_videos(monkeypatch):
 
     results = tools.get_live_title_and_url("UU1", "g", ["none"])
 
-    assert [url for _, url, _ in results] == [
+    assert [r[1] for r in results] == [
         "https://www.youtube.com/watch?v=v4"
     ]
+
+
+def test_video_in_both_playlists_is_returned_once(monkeypatch):
+    patch_youtube(monkeypatch, ["v1"], {"v1": make_video("v1", "live")})
+
+    results = tools.get_multiple_live_title_and_url(
+        {"UC1": "UU1", "UC1_member": "UUMO1"}, ["live"], "g"
+    )
+
+    assert len(results) == 1

@@ -217,6 +217,7 @@ def get_multiple_live_title_and_url(upload_ids, broadcast_types, group):
         A Multiple Live Title, URL, and Channel Title from Select Channels
     """
     results = []
+    seen_urls = set()
 
     for channel_key, upload_id in upload_ids.items():
         # Check if this is a member-only playlist
@@ -236,8 +237,12 @@ def get_multiple_live_title_and_url(upload_ids, broadcast_types, group):
             original_channel_id,
         )
 
-        if live_title_and_url:
-            results.extend(live_title_and_url)
+        # Ignore files are only updated after sending, so a video found in
+        # both the upload and member-only playlists must be deduped here
+        for result in live_title_and_url:
+            if result[1] not in seen_urls:
+                seen_urls.add(result[1])
+                results.append(result)
 
     return results
 
@@ -263,8 +268,8 @@ def get_live_title_and_url(
         video_info_cache (dict): Video info already fetched, keyed by ID.
 
     Returns:
-        tuple: (Live Title, URL, Channel Title) if live,
-            else (None, None, None).
+        list: (Live Title, URL, Channel Title, Mark Notified) per video;
+            call Mark Notified after sending to skip it next time.
     """
     videos = YoutubeHandler().find_recent_video(
         upload_id, max_results=max_results
@@ -330,8 +335,14 @@ def get_live_title_and_url(
             channel_title = snippet["channelTitle"]
             url = f"https://www.youtube.com/watch?v={video_id}"
 
-            update_ignore_json(ignore_json, ignore_list, video_id, live_title)
-            results.append((live_title, url, channel_title))
+            results.append(
+                (
+                    live_title,
+                    url,
+                    channel_title,
+                    make_mark_notified(ignore_json, video_id, live_title),
+                )
+            )
 
     if upcoming == max_results:
         log("[main]", "All videos are upcoming")
@@ -384,11 +395,16 @@ def get_multiple_twitch_title_and_url(channel_ids, group):
         if stream_id in ignore_list:
             continue
 
-        update_ignore_json(ignore_json, ignore_list, stream_id, live_title)
-
         url = f"https://www.twitch.tv/{channel_title}"
 
-        results.append((live_title, url, user_name))
+        results.append(
+            (
+                live_title,
+                url,
+                user_name,
+                make_mark_notified(ignore_json, stream_id, live_title),
+            )
+        )
 
     return results
 
@@ -421,6 +437,21 @@ def update_ignore_json(json_path, ignore_list, key, value):
     """
     ignore_list[key] = value
     save_json(json_path, ignore_list)
+
+
+def make_mark_notified(json_path, key, value):
+    """Build a callback that records `key` in the ignore json.
+
+    Args:
+        `json_path`: Ignore Json Path
+        `key`: Video ID or Stream ID
+        `value`: Title
+    """
+
+    def mark_notified():
+        update_ignore_json(json_path, load_ignore_json(json_path), key, value)
+
+    return mark_notified
 
 
 def create_empty_json(json_path):
