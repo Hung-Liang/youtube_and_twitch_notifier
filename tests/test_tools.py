@@ -110,3 +110,36 @@ def test_video_in_both_playlists_is_returned_once(monkeypatch):
     )
 
     assert len(results) == 1
+
+
+def test_exception_message_escapes_html():
+    message = tools.format_exception_message("File <module> & co")
+
+    assert message == (
+        "<b>[Exception]</b>\n<pre>File &lt;module&gt; &amp; co</pre>"
+    )
+
+
+def test_exception_message_keeps_tail_within_limit():
+    text = "start\n" + "<&>" * 5000 + "\nValueError: boom"
+
+    message = tools.format_exception_message(text)
+
+    assert len(message) <= tools.TELEGRAM_MESSAGE_LIMIT
+    assert "ValueError: boom</pre>" in message
+    assert "start" not in message
+
+
+def test_exception_log_sends_text_message(monkeypatch):
+    sent = []
+
+    class FakeTelegram:
+        def send_message(self, cid, message):
+            sent.append(message)
+            return True
+
+    monkeypatch.setattr(tools, "TelegramHandler", FakeTelegram)
+
+    tools.send_exception_log("boom")
+
+    assert sent == ["<b>[Exception]</b>\n<pre>boom</pre>"]

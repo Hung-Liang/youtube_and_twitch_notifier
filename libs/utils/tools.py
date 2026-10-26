@@ -24,6 +24,8 @@ TELEGRAM_ADMIN_ID = os.environ.get("telegram_admin_id")
 
 UPLOAD_PLAYLIST_LOCK = threading.Lock()
 
+TELEGRAM_MESSAGE_LIMIT = 4096
+
 
 def load_json(path):
     """Load Json from Select File
@@ -122,19 +124,40 @@ def send_exception_log(e):
     log("=" * 80)
     log("=" * 80)
 
-    filename = log("[main]", e, return_filename=True)
+    log("[main]", e)
 
     log("=" * 80)
     log("=" * 80)
 
-    log_path = Path(LOG_PATH, filename)
     # Upload failure must not abort the caller's notification job
     try:
-        TelegramHandler().send_document(
-            TELEGRAM_ADMIN_ID, log_path, "[Exception] " + filename
+        TelegramHandler().send_message(
+            TELEGRAM_ADMIN_ID, format_exception_message(e)
         )
     except requests.RequestException as err:
         log("[main]", f"Send exception log failed: {err!r}")
+
+
+def format_exception_message(e):
+    """Format an exception as a Telegram HTML message within size limit.
+
+    Args:
+        `e`: Exception
+
+    Returns:
+        A Telegram HTML message
+    """
+    header = "<b>[Exception]</b>\n"
+    text = str(e)
+
+    # Keep the tail, where a traceback shows the actual error
+    while True:
+        body = html.escape(text, quote=False)
+        if len(header) + len(body) + len("<pre></pre>") <= (
+            TELEGRAM_MESSAGE_LIMIT
+        ):
+            return f"{header}<pre>{body}</pre>"
+        text = "...\n" + text[-(len(text) * 9 // 10):]
 
 
 def get_upload_id(channel_id):
