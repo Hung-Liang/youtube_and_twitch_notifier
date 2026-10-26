@@ -103,6 +103,16 @@ twitch_client_secret=""
 - [ ] Add more notifier types.
 - [x] ~~Issue when a channel id in config in different group will cause second group to not work.~~
 
+## Running tests
+
+- Tests run in a local [uv](https://docs.astral.sh/uv/) virtual environment on Python 3.10, the same version as the server.
+
+```bash
+uv venv --python 3.10
+uv pip install -r requirements-dev.txt
+uv run pytest
+```
+
 ## Support me
 
 <a href="https://www.buymeacoffee.com/hungliang" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>

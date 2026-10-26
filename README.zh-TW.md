@@ -106,6 +106,16 @@ twitch_client_secret=""
 1. 前往要追蹤的 Twitch 頻道。  
 2. 頻道 ID 位於網址 `twitch.tv/` 之後的部分。  
 
+## 執行測試
+
+- 測試使用本機的 [uv](https://docs.astral.sh/uv/) 虛擬環境，Python 版本為 3.10，與伺服器相同。
+
+```bash
+uv venv --python 3.10
+uv pip install -r requirements-dev.txt
+uv run pytest
+```
+
 ## 支持我
 
 <a href="https://www.buymeacoffee.com/hungliang" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
