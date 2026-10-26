@@ -1,8 +1,8 @@
-import pytz
 from apscheduler.events import EVENT_JOB_ERROR
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 from libs.config import youtube_groups, twitch_groups
+from libs.utils.logger import TIMEZONE
 from libs.utils.notify import send_notify
 from libs.utils.tools import (
     send_daily_log,
@@ -30,8 +30,7 @@ def on_job_error(event):
 
 send_service_start_notification()
 
-timezone = pytz.timezone("Asia/Taipei")
-scheduler = BlockingScheduler(timezone=timezone)
+scheduler = BlockingScheduler(timezone=TIMEZONE)
 scheduler.add_listener(on_job_error, EVENT_JOB_ERROR)
 
 schedule_group_jobs(scheduler, "youtube", youtube_groups)

@@ -14,7 +14,7 @@ from libs.utils.file_path import (
     LOG_PATH,
     UPLOAD_PLAYLIST_JSON_PATH,
 )
-from libs.utils.logger import log
+from libs.utils.logger import get_log_filename, log
 
 load_dotenv()
 
@@ -86,14 +86,22 @@ def send_service_start_notification():
 def send_daily_log():
     """Send Daily Log to Telegram Admin"""
 
-    filenames = os.listdir(LOG_PATH)
+    filenames = sorted(os.listdir(LOG_PATH))
+    current_filename = get_log_filename()
 
     for filename in filenames:
+        # Other jobs may still be writing to today's log
+        if filename == current_filename:
+            continue
+
         log_path = Path(LOG_PATH, filename)
-        TelegramHandler().send_document(
+        sent, _ = TelegramHandler().send_document(
             TELEGRAM_ADMIN_ID, log_path, "[Daily Log] " + filename
         )
-        log_path.unlink()
+
+        # Keep the file so it will be retried on the next run
+        if sent:
+            log_path.unlink()
 
 
 def send_exception_log(e):

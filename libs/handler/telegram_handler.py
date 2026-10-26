@@ -64,18 +64,15 @@ class TelegramHandler:
             True if success, False if fail.
         """
 
-        files = {
-            "document": (
-                filename,
-                open(path, 'rb'),
-                'application/octet-stream',
-            ),
-        }
         url = 'https://api.telegram.org/bot{}/sendDocument?chat_id={}'.format(
             self.token, cid
         )
 
-        res = requests.post(url, files=files, timeout=REQUEST_TIMEOUT)
+        with open(path, 'rb') as f:
+            files = {
+                "document": (filename, f, 'application/octet-stream'),
+            }
+            res = requests.post(url, files=files, timeout=REQUEST_TIMEOUT)
 
         log(
             '[telegram_lib]',
