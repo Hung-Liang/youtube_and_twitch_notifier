@@ -66,6 +66,8 @@ def get_message(notifier_type, title, url, channel_title, word_list):
         message = "<b>{}\n{}\n{}</b>".format(random_word, title, url)
     elif notifier_type == "discord":
         message = "{}\n\n[{}]({})".format(random_word, title, url)
+    else:
+        raise ValueError(f"Unknown notifier_type: {notifier_type}")
 
     return message
 

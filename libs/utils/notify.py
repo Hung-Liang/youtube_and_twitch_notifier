@@ -12,12 +12,13 @@ from libs.utils.tools import (
 def send_notify_by_type(notifier_type, data, title, url, channel_title):
     def send_with_retry(handler, message, users):
         for user in users:
-            sent = handler.send_message(user, message)
-            if not sent:
-                message = get_message(
-                    notifier_type, "", url, channel_title, data["word_list"]
-                )
-                sent = handler.send_message(user, message)
+            if handler.send_message(user, message):
+                continue
+
+            fallback_message = get_message(
+                notifier_type, "", url, channel_title, data["word_list"]
+            )
+            if not handler.send_message(user, fallback_message):
                 send_exception_log(
                     f"[main] {notifier_type.capitalize()} Message Sent Failed"
                 )
@@ -32,6 +33,8 @@ def send_notify_by_type(notifier_type, data, title, url, channel_title):
     elif notifier_type == "discord":
         users = data["webhook_urls"]
         handler = DiscordHandler()
+    else:
+        raise ValueError(f"Unknown notifier_type: {notifier_type}")
 
     send_with_retry(handler, message, users)
 
