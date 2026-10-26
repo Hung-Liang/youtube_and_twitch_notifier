@@ -5,6 +5,8 @@ from libs.utils.logger import log
 
 load_dotenv()
 
+REQUEST_TIMEOUT = 10
+
 
 class DiscordHandler:
     """Discord Handler
@@ -28,7 +30,9 @@ class DiscordHandler:
 
         url = webhook_url
 
-        res = requests.post(url, json={"content": message})
+        res = requests.post(
+            url, json={"content": message}, timeout=REQUEST_TIMEOUT
+        )
 
         log(
             '[discord_lib]',

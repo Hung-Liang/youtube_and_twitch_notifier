@@ -7,6 +7,8 @@ from libs.utils.logger import log
 
 load_dotenv()
 
+REQUEST_TIMEOUT = 10
+
 
 class TwitchHandler:
     def __init__(self):
@@ -23,7 +25,9 @@ class TwitchHandler:
             "client_secret": self.client_secret,
             "grant_type": "client_credentials",
         }
-        response = requests.post(url, params=params)
+        response = requests.post(
+            url, params=params, timeout=REQUEST_TIMEOUT
+        )
 
         if response.status_code == 200:
             data = response.json()
@@ -45,7 +49,12 @@ class TwitchHandler:
     def get_stream_info(self, username: str):
         url = f"{self.base_url}streams"
         params = {"user_login": username}
-        response = requests.get(url, headers=self.headers, params=params)
+        response = requests.get(
+            url,
+            headers=self.headers,
+            params=params,
+            timeout=REQUEST_TIMEOUT,
+        )
 
         if response.status_code == 200:
             data = response.json()
@@ -67,7 +76,12 @@ class TwitchHandler:
     def get_stream_infos(self, usernames: list):
         url = f"{self.base_url}streams"
         params = {"user_login": usernames}
-        response = requests.get(url, headers=self.headers, params=params)
+        response = requests.get(
+            url,
+            headers=self.headers,
+            params=params,
+            timeout=REQUEST_TIMEOUT,
+        )
 
         if response.status_code == 200:
             data = response.json()

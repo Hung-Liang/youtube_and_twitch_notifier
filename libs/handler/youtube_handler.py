@@ -9,6 +9,8 @@ from libs.utils.logger import log
 
 load_dotenv()
 
+REQUEST_TIMEOUT = 10
+
 
 class YoutubeHandler:
     """Telegram Handler
@@ -39,7 +41,7 @@ class YoutubeHandler:
             "id={}&key={}&part=contentDetails".format(channel_id, self.token)
         )
 
-        res = requests.get(url)
+        res = requests.get(url, timeout=REQUEST_TIMEOUT)
 
         log(
             '[youtube_lib]',
@@ -88,7 +90,7 @@ class YoutubeHandler:
             )
         )
 
-        res = requests.get(url)
+        res = requests.get(url, timeout=REQUEST_TIMEOUT)
 
         log(
             '[youtube_lib]',
@@ -120,7 +122,7 @@ class YoutubeHandler:
             "part={}&id={}&key={}".format(part, video_id, self.token)
         )
 
-        res = requests.get(url)
+        res = requests.get(url, timeout=REQUEST_TIMEOUT)
 
         log(
             '[youtube_lib]',
@@ -151,7 +153,7 @@ class YoutubeHandler:
             )
         )
 
-        res = requests.get(url)
+        res = requests.get(url, timeout=REQUEST_TIMEOUT)
 
         log(
             '[youtube_lib]',

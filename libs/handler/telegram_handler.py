@@ -8,6 +8,8 @@ from libs.utils.logger import log
 
 load_dotenv()
 
+REQUEST_TIMEOUT = 10
+
 
 class TelegramHandler:
     """Telegram Handler
@@ -42,7 +44,7 @@ class TelegramHandler:
             )
         )
 
-        res = requests.get(url)
+        res = requests.get(url, timeout=REQUEST_TIMEOUT)
 
         log(
             '[telegram_lib]',
@@ -77,7 +79,7 @@ class TelegramHandler:
             self.token, cid
         )
 
-        res = requests.post(url, files=files)
+        res = requests.post(url, files=files, timeout=REQUEST_TIMEOUT)
 
         log(
             '[telegram_lib]',
@@ -105,7 +107,7 @@ class TelegramHandler:
             '/sendDocument?chat_id={}&document={}'.format(self.token, cid, fid)
         )
 
-        res = requests.post(url)
+        res = requests.post(url, timeout=REQUEST_TIMEOUT)
 
         log(
             '[telegram_lib]',
@@ -131,7 +133,7 @@ class TelegramHandler:
             self.token, fid
         )
 
-        res = requests.post(url)
+        res = requests.post(url, timeout=REQUEST_TIMEOUT)
 
         log(
             '[telegram_lib]',
@@ -144,7 +146,7 @@ class TelegramHandler:
             self.token, file_uri
         )
 
-        res = requests.get(url)
+        res = requests.get(url, timeout=REQUEST_TIMEOUT)
 
         log(
             '[telegram_lib]',
