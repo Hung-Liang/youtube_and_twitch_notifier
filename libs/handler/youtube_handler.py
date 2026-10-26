@@ -13,7 +13,7 @@ REQUEST_TIMEOUT = 10
 
 
 class YoutubeHandler:
-    """Telegram Handler
+    """Youtube Handler
 
     Attributes:
         `token`: Youtube api 3 Token.
@@ -21,9 +21,11 @@ class YoutubeHandler:
 
     def __init__(self):
         # self.token = os.environ.get("youtube_api_token")
-        self.token = random.choice(
-            os.environ.get("youtube_api_token").split(",")
-        )
+        tokens = os.environ.get("youtube_api_token")
+        if not tokens:
+            raise ValueError("youtube_api_token is not set in .env")
+
+        self.token = random.choice(tokens.split(","))
         # Pass the key via header so it never appears in URLs or tracebacks
         self.headers = {"X-goog-api-key": self.token}
 
