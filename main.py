@@ -28,14 +28,19 @@ def on_job_error(event):
     )
 
 
-send_service_start_notification()
+def main():
+    send_service_start_notification()
 
-scheduler = BlockingScheduler(timezone=TIMEZONE)
-scheduler.add_listener(on_job_error, EVENT_JOB_ERROR)
+    scheduler = BlockingScheduler(timezone=TIMEZONE)
+    scheduler.add_listener(on_job_error, EVENT_JOB_ERROR)
 
-schedule_group_jobs(scheduler, "youtube", youtube_groups)
-schedule_group_jobs(scheduler, "twitch", twitch_groups)
+    schedule_group_jobs(scheduler, "youtube", youtube_groups)
+    schedule_group_jobs(scheduler, "twitch", twitch_groups)
 
-scheduler.add_job(send_daily_log, "cron", hour=0, minute=0)
+    scheduler.add_job(send_daily_log, "cron", hour=0, minute=0)
 
-scheduler.start()
+    scheduler.start()
+
+
+if __name__ == "__main__":
+    main()
