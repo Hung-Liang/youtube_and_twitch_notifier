@@ -16,7 +16,7 @@ class DiscordHandler:
     """
 
     def __init__(self):
-        pass
+        self.last_status_code = None
 
     def send_message(self, webhook_url, message):
         """Send message to Discord.
@@ -33,6 +33,7 @@ class DiscordHandler:
         res = requests.post(
             url, json={"content": message}, timeout=REQUEST_TIMEOUT
         )
+        self.last_status_code = res.status_code
 
         log(
             '[discord_lib]',

@@ -25,6 +25,7 @@ class TelegramHandler:
 
     def __init__(self):
         self.token = os.environ.get("bot_token")
+        self.last_status_code = None
 
     def send_message(self, cid, message):
         """Send message to Telegram.
@@ -41,6 +42,7 @@ class TelegramHandler:
         data = {"chat_id": cid, "parse_mode": "HTML", "text": message}
 
         res = requests.post(url, data=data, timeout=REQUEST_TIMEOUT)
+        self.last_status_code = res.status_code
 
         log(
             '[telegram_lib]',

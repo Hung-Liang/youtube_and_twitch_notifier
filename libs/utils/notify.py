@@ -15,6 +15,14 @@ def send_notify_by_type(notifier_type, data, title, url, channel_title):
             if handler.send_message(user, message):
                 continue
 
+            # Not found won't recover with a different message
+            if handler.last_status_code == 404:
+                send_exception_log(
+                    f"[main] {notifier_type.capitalize()} Message Sent Failed"
+                    f" (404, skip fallback)"
+                )
+                continue
+
             fallback_message = get_message(
                 notifier_type, "", url, channel_title, data["word_list"]
             )
