@@ -1,3 +1,4 @@
+import html
 import json
 import os
 import random
@@ -63,6 +64,8 @@ def get_message(notifier_type, title, url, channel_title, word_list):
         random_word = channel_title
 
     if notifier_type == "telegram":
+        random_word = html.escape(random_word, quote=False)
+        title = html.escape(title, quote=False)
         message = "<b>{}\n{}\n{}</b>".format(random_word, title, url)
     elif notifier_type == "discord":
         message = "{}\n\n[{}]({})".format(random_word, title, url)
@@ -280,14 +283,12 @@ def get_live_title_and_url(
             continue
 
         if broadcast_status in broadcast_types:
-            live_title = replace_html_sensitive_symbols(snippet["title"])
+            live_title = snippet["title"]
 
             if is_member_only:
                 live_title = "【Member Only】\n" + live_title
 
-            channel_title = replace_html_sensitive_symbols(
-                snippet["channelTitle"]
-            )
+            channel_title = snippet["channelTitle"]
             url = f"https://www.youtube.com/watch?v={video_id}"
 
             update_ignore_json(ignore_json, ignore_list, video_id, live_title)
@@ -332,7 +333,7 @@ def get_multiple_twitch_title_and_url(channel_ids, group):
     group_path.mkdir(parents=True, exist_ok=True)
 
     for stream_info in stream_infos:
-        live_title = replace_html_sensitive_symbols(stream_info['title'])
+        live_title = stream_info['title']
         stream_id = stream_info['stream_id']
         channel_title = stream_info['user_login']
         user_name = stream_info['user_name']
@@ -378,7 +379,7 @@ def get_twitch_title_and_url(channel_id, group):
     if stream_id in ignore_list:
         return None, None, None
 
-    live_title = replace_html_sensitive_symbols(stream_info['title'])
+    live_title = stream_info['title']
     update_ignore_json(ignore_json, ignore_list, stream_id, live_title)
 
     return live_title, f"https://www.twitch.tv/{channel_id}", channel_id
@@ -412,41 +413,6 @@ def update_ignore_json(json_path, ignore_list, key, value):
     """
     ignore_list[key] = value
     save_json(json_path, ignore_list)
-
-
-def replace_html_sensitive_symbols(text):
-    """Remove HTML Sensitive Symbols from Select Text
-
-    Args:
-        text: The input text to be sanitized.
-
-    Returns:
-        str: Text without HTML sensitive symbols.
-    """
-    replacements = {
-        '%': '%25',
-        '&': '%26',
-        '+': '%2B',
-        '#': '%23',
-        '>': '%3E',
-        '=': '%3D',
-        '<': '%26lt;',
-        '"': '%22',
-        "'": '%27',
-        '/': '%2F',
-        '(': '%28',
-        ')': '%29',
-        '{': '%7B',
-        '}': '%7D',
-        '[': '%5B',
-        ']': '%5D',
-        '|': '%7C',
-    }
-
-    for symbol, replacement in replacements.items():
-        text = text.replace(symbol, replacement)
-
-    return text
 
 
 def migrate_playlist_ignore_to_channel(group, channel_id, upload_id):

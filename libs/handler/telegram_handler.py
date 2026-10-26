@@ -37,14 +37,10 @@ class TelegramHandler:
             True if success, False if fail.
         """
 
-        url = (
-            'https://api.telegram.org/bot{}'
-            '/sendMessage?chat_id={}&parse_mode=HTML&text={}'.format(
-                self.token, cid, message
-            )
-        )
+        url = 'https://api.telegram.org/bot{}/sendMessage'.format(self.token)
+        data = {"chat_id": cid, "parse_mode": "HTML", "text": message}
 
-        res = requests.get(url, timeout=REQUEST_TIMEOUT)
+        res = requests.post(url, data=data, timeout=REQUEST_TIMEOUT)
 
         log(
             '[telegram_lib]',
