@@ -1,6 +1,13 @@
+import json
+
 import pytest
 
-from libs.handler import discord_handler, telegram_handler, youtube_handler
+from libs.handler import (
+    discord_handler,
+    telegram_handler,
+    twitch_handler,
+    youtube_handler,
+)
 from libs.utils import tools
 
 
@@ -8,7 +15,9 @@ class FakeResponse:
     def __init__(self, status_code, body):
         self.status_code = status_code
         self.body = body
-        self.text = str(body)
+        self.text = (
+            str(body) if isinstance(body, Exception) else json.dumps(body)
+        )
 
     def json(self):
         if isinstance(self.body, Exception):
@@ -118,3 +127,149 @@ def test_other_403_does_not_switch_key(monkeypatch, youtube):
 
     assert res.status_code == 403
     assert youtube_handler._exhausted_keys == {}
+
+
+def test_youtube_error_responses_return_none(monkeypatch):
+    monkeypatch.setattr(
+        youtube_handler.requests,
+        "get",
+        lambda url, headers, timeout: FakeResponse(500, {}),
+    )
+    handler = youtube_handler.YoutubeHandler()
+
+    assert handler.get_upload_playlist_id("UC1") is None
+    assert handler.find_recent_video("UU1") is None
+    assert handler.get_video_info("v1") is None
+
+
+def test_youtube_unknown_channel_returns_none(monkeypatch):
+    monkeypatch.setattr(
+        youtube_handler.requests,
+        "get",
+        lambda url, headers, timeout: FakeResponse(200, {"items": []}),
+    )
+    handler = youtube_handler.YoutubeHandler()
+
+    assert handler.get_upload_playlist_id("UC1") is None
+
+
+def test_youtube_missing_token_raises(monkeypatch):
+    monkeypatch.delenv("youtube_api_token")
+
+    with pytest.raises(ValueError):
+        youtube_handler.YoutubeHandler()
+
+
+def test_youtube_key_is_sent_in_header_not_url(monkeypatch):
+    requests_seen = []
+
+    def get(url, headers, timeout):
+        requests_seen.append((url, headers))
+        return FakeResponse(200, {"items": []})
+
+    monkeypatch.setattr(youtube_handler.requests, "get", get)
+
+    youtube_handler.YoutubeHandler().find_recent_video("UU1")
+
+    url, headers = requests_seen[0]
+    assert headers == {"X-goog-api-key": "key1"}
+    assert "key1" not in url
+
+
+def test_telegram_send_document_returns_body(monkeypatch, tmp_path):
+    path = tmp_path / "a.log"
+    path.write_text("x", encoding="utf-8")
+    patch_post(
+        monkeypatch, telegram_handler, FakeResponse(200, {"ok": True})
+    )
+
+    sent, body = telegram_handler.TelegramHandler().send_document(
+        "1", path, "a.log"
+    )
+
+    assert sent is True
+    assert body == {"ok": True}
+
+
+@pytest.fixture
+def twitch(monkeypatch):
+    """Fake Twitch API; `valid_token` is the token streams accept."""
+    monkeypatch.setattr(twitch_handler, "_access_token", None)
+    state = {"tokens_issued": 0, "valid_token": "t1", "stream_calls": 0}
+
+    def post(url, params, timeout):
+        state["tokens_issued"] += 1
+        return FakeResponse(
+            200, {"access_token": f"t{state['tokens_issued']}"}
+        )
+
+    def get(url, headers, params, timeout):
+        state["stream_calls"] += 1
+        if headers["Authorization"] != f"Bearer {state['valid_token']}":
+            return FakeResponse(401, {})
+        return FakeResponse(
+            200,
+            {
+                "data": [
+                    {
+                        "title": "live!",
+                        "id": "s1",
+                        "user_login": "chu",
+                        "user_name": "Chu",
+                    }
+                ]
+            },
+        )
+
+    monkeypatch.setattr(twitch_handler.requests, "post", post)
+    monkeypatch.setattr(twitch_handler.requests, "get", get)
+    return state
+
+
+def test_twitch_token_is_shared_across_instances(twitch):
+    twitch_handler.TwitchHandler()
+    twitch_handler.TwitchHandler()
+
+    assert twitch["tokens_issued"] == 1
+
+
+def test_twitch_refreshes_token_on_401(twitch):
+    handler = twitch_handler.TwitchHandler()
+    twitch["valid_token"] = "t2"
+
+    streams = handler.get_stream_infos(["chu"])
+
+    assert twitch["tokens_issued"] == 2
+    assert twitch["stream_calls"] == 2
+    assert streams == [
+        {
+            "is_live": True,
+            "title": "live!",
+            "stream_id": "s1",
+            "user_login": "chu",
+            "user_name": "Chu",
+        }
+    ]
+
+
+def test_twitch_error_raises(twitch, monkeypatch):
+    monkeypatch.setattr(
+        twitch_handler.requests,
+        "get",
+        lambda url, headers, params, timeout: FakeResponse(500, {}),
+    )
+
+    with pytest.raises(Exception, match="Twitch API Error: 500"):
+        twitch_handler.TwitchHandler().get_stream_infos(["chu"])
+
+
+def test_twitch_token_error_raises(monkeypatch):
+    monkeypatch.setattr(twitch_handler, "_access_token", None)
+    monkeypatch.setattr(
+        twitch_handler.requests,
+        "post",
+        lambda url, params, timeout: FakeResponse(400, {}),
+    )
+
+    with pytest.raises(Exception, match="Twitch API Error: 400"):
+        twitch_handler.TwitchHandler()

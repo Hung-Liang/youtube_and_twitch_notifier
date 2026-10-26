@@ -1,3 +1,6 @@
+import pytest
+import requests
+
 from libs.utils import tools
 
 
@@ -143,3 +146,208 @@ def test_exception_log_sends_text_message(monkeypatch):
     tools.send_exception_log("boom")
 
     assert sent == ["<b>[Exception]</b>\n<pre>boom</pre>"]
+
+
+def test_get_message_unknown_type_raises():
+    with pytest.raises(ValueError):
+        tools.get_message("line", "t", "https://x", "ch", [])
+
+
+def test_load_ignore_json_creates_missing_file(tmp_path):
+    path = tmp_path / "new.json"
+
+    assert tools.load_ignore_json(path) == {}
+    assert tools.load_json(path) == {}
+
+
+def test_broadcast_types_filter_videos(monkeypatch):
+    patch_youtube(
+        monkeypatch,
+        ["v1", "v2"],
+        {"v1": make_video("v1", "live"), "v2": make_video("v2", "none")},
+    )
+
+    results = tools.get_live_title_and_url("UU1", "g", ["none"])
+
+    assert [r[1] for r in results] == ["https://www.youtube.com/watch?v=v2"]
+
+
+def test_member_only_title_and_shared_ignore_file(monkeypatch, isolate):
+    patch_youtube(monkeypatch, ["v1"], {"v1": make_video("v1", "live")})
+
+    results = tools.get_live_title_and_url(
+        "UUMO1", "g", ["live"], is_member_only=True, channel_id="UC1"
+    )
+    results[0][3]()
+
+    assert results[0][0] == "【Member Only】\ntitle"
+    ignore = tools.load_json(isolate / "ignore" / "g" / "UC1.json")
+    assert ignore == {"v1": "【Member Only】\ntitle"}
+
+
+def test_video_without_info_is_skipped(monkeypatch):
+    patch_youtube(monkeypatch, ["v1"], {})
+
+    assert tools.get_live_title_and_url("UU1", "g", ["live"]) == []
+
+
+def test_no_videos_returns_empty(monkeypatch):
+    monkeypatch.setattr(
+        tools.YoutubeHandler, "find_recent_video", lambda *a, **k: None
+    )
+
+    assert tools.get_live_title_and_url("UU1", "g", ["live"]) == []
+
+
+def test_ignored_video_info_is_not_fetched(monkeypatch, isolate):
+    patch_youtube(monkeypatch, ["v1"], {"v1": make_video("v1", "live")})
+    group_path = isolate / "ignore" / "g"
+    group_path.mkdir()
+    tools.save_json(group_path / "UU1.json", {"v1": "title"})
+
+    def get_video_info(self, video_id, part="snippet"):
+        raise AssertionError("ignored video should not be fetched")
+
+    monkeypatch.setattr(tools.YoutubeHandler, "get_video_info", get_video_info)
+
+    assert tools.get_live_title_and_url("UU1", "g", ["live"]) == []
+
+
+def test_get_upload_id_caches_api_result(monkeypatch):
+    calls = []
+
+    def get_upload_playlist_id(self, channel_id):
+        calls.append(channel_id)
+        return "UU" + channel_id[2:]
+
+    monkeypatch.setattr(
+        tools.YoutubeHandler, "get_upload_playlist_id", get_upload_playlist_id
+    )
+
+    assert tools.get_upload_id("UC1") == "UU1"
+    assert tools.get_upload_id("UC1") == "UU1"
+    assert calls == ["UC1"]
+
+
+def test_get_upload_id_does_not_cache_failure(monkeypatch):
+    monkeypatch.setattr(
+        tools.YoutubeHandler,
+        "get_upload_playlist_id",
+        lambda self, channel_id: None,
+    )
+
+    assert tools.get_upload_id("UC1") is None
+    assert tools.load_json(tools.UPLOAD_PLAYLIST_JSON_PATH) == {}
+
+
+def test_get_multiple_upload_id_adds_member_playlist(monkeypatch):
+    monkeypatch.setattr(tools, "get_upload_id", lambda c: "UU" + c[2:])
+
+    assert tools.get_multiple_upload_id(["UC1"]) == {"UC1": "UU1"}
+    assert tools.get_multiple_upload_id(["UC1"], True) == {
+        "UC1": "UU1",
+        "UC1_member": "UUMO1",
+    }
+
+
+def test_member_playlist_requires_uc_prefix():
+    handler = tools.YoutubeHandler()
+
+    assert handler.get_member_only_playlist_id("UC123") == "UUMO123"
+    assert handler.get_member_only_playlist_id("XX123") is None
+
+
+def patch_twitch(monkeypatch, streams):
+    monkeypatch.setattr(
+        tools,
+        "TwitchHandler",
+        lambda: type("FakeTwitch", (), {
+            "get_stream_infos": lambda self, usernames: streams,
+        })(),
+    )
+
+
+def make_stream(stream_id, login="chu"):
+    return {
+        "is_live": True,
+        "title": "live!",
+        "stream_id": stream_id,
+        "user_login": login,
+        "user_name": "Chu",
+    }
+
+
+def test_twitch_skips_query_without_channels(monkeypatch):
+    def fail():
+        raise AssertionError("twitch should not be queried")
+
+    monkeypatch.setattr(tools, "TwitchHandler", fail)
+
+    assert tools.get_multiple_twitch_title_and_url([], "g") == []
+
+
+def test_twitch_stream_is_returned_until_marked(monkeypatch):
+    patch_twitch(monkeypatch, [make_stream("s1")])
+
+    first = tools.get_multiple_twitch_title_and_url(["chu"], "g")
+    assert [r[:3] for r in first] == [
+        ("live!", "https://www.twitch.tv/chu", "Chu")
+    ]
+
+    first[0][3]()
+    assert tools.get_multiple_twitch_title_and_url(["chu"], "g") == []
+
+    # A new stream id is a new broadcast
+    patch_twitch(monkeypatch, [make_stream("s2")])
+    assert len(tools.get_multiple_twitch_title_and_url(["chu"], "g")) == 1
+
+
+class FakeTelegramDocument:
+    sent = []
+    succeed = True
+
+    def send_document(self, cid, path, filename):
+        self.sent.append(filename)
+        return self.succeed, {}
+
+
+def test_daily_log_uploads_past_logs_only(monkeypatch, isolate):
+    log_path = isolate / "log"
+    today = tools.get_log_filename()
+    for name in ["2026-01-01.log", "2026-01-02.log", today]:
+        (log_path / name).write_text("x", encoding="utf-8")
+
+    FakeTelegramDocument.sent = []
+    FakeTelegramDocument.succeed = True
+    monkeypatch.setattr(tools, "TelegramHandler", FakeTelegramDocument)
+
+    tools.send_daily_log()
+
+    assert FakeTelegramDocument.sent == [
+        "[Daily Log] 2026-01-01.log",
+        "[Daily Log] 2026-01-02.log",
+    ]
+    assert [p.name for p in log_path.iterdir()] == [today]
+
+
+def test_daily_log_keeps_file_when_upload_fails(monkeypatch, isolate):
+    log_path = isolate / "log"
+    (log_path / "2026-01-01.log").write_text("x", encoding="utf-8")
+
+    FakeTelegramDocument.sent = []
+    FakeTelegramDocument.succeed = False
+    monkeypatch.setattr(tools, "TelegramHandler", FakeTelegramDocument)
+
+    tools.send_daily_log()
+
+    assert (log_path / "2026-01-01.log").exists()
+
+
+def test_exception_log_survives_telegram_error(monkeypatch):
+    class BrokenTelegram:
+        def send_message(self, cid, message):
+            raise requests.ConnectionError()
+
+    monkeypatch.setattr(tools, "TelegramHandler", BrokenTelegram)
+
+    tools.send_exception_log("boom")
