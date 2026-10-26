@@ -17,7 +17,7 @@ youtube_groups = {
     "group1": {
         "interval": 3,
         "channel_ids": [],
-        "broadcast_types": [],
+        "broadcast_types": ["none", "live"],
         "notifier_types": {
             "telegram": {
                 "recipient_ids": [],
@@ -60,6 +60,8 @@ twitch_groups = {
   - word_list is a list of words will randomly be selected and added to the top of the message.
   - if the word_list is empty, the top of the message will be stream channel name.
 - `interval` is the time in minutes between each check.
+  - Use a value that divides 60 (e.g. 1, 2, 3, 5, 10), otherwise polling gaps will be uneven.
+- `config.py` is checked at startup: missing or invalid settings stop the service, and an uneven `interval` or empty `broadcast_types` only logs a warning.
 
 ## Env file
 

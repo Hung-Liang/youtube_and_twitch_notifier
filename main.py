@@ -2,7 +2,8 @@ from apscheduler.events import EVENT_JOB_ERROR
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 from libs.config import youtube_groups, twitch_groups
-from libs.utils.logger import TIMEZONE
+from libs.utils.config_check import check_groups
+from libs.utils.logger import TIMEZONE, log
 from libs.utils.notify import send_notify
 from libs.utils.tools import (
     send_daily_log,
@@ -28,7 +29,24 @@ def on_job_error(event):
     )
 
 
+def check_config():
+    errors = []
+    for platform, groups in (
+        ("youtube", youtube_groups),
+        ("twitch", twitch_groups),
+    ):
+        group_errors, group_warnings = check_groups(platform, groups)
+        errors += group_errors
+        for warning in group_warnings:
+            log("[config]", f"warning: {warning}", console=True)
+
+    if errors:
+        raise ValueError("Invalid config.py:\n" + "\n".join(errors))
+
+
 def main():
+    check_config()
+
     send_service_start_notification()
 
     scheduler = BlockingScheduler(timezone=TIMEZONE)

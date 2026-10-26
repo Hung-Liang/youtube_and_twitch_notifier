@@ -17,7 +17,7 @@ youtube_groups = {
     "group1": {
         "interval": 3,
         "channel_ids": [],
-        "broadcast_types": [],
+        "broadcast_types": ["none", "live"],
         "notifier_types": {
             "telegram": {
                 "recipient_ids": [],
@@ -62,6 +62,8 @@ twitch_groups = {
 - `word_list` 為隨機選取的字詞，會顯示在通知訊息開頭。  
   - 若 `word_list` 為空，則開頭將顯示直播頻道名稱。  
 - `interval` 指每次檢查的間隔時間（以分鐘計算）。  
+  - 建議設定能整除 60 的數值（如 1、2、3、5、10），否則檢查間隔會不平均。  
+- 啟動時會檢查 `config.py`：缺少或錯誤的設定會讓服務無法啟動；`interval` 無法整除 60 或 `broadcast_types` 為空只會記錄警告。  
 
 ## 設定 `.env` 檔案
 
