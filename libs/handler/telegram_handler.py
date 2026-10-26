@@ -25,6 +25,7 @@ class TelegramHandler:
     def __init__(self):
         self.token = os.environ.get("bot_token")
         self.last_status_code = None
+        self.last_retry_after = None
 
     def send_message(self, cid, message):
         """Send message to Telegram.
@@ -42,6 +43,14 @@ class TelegramHandler:
 
         res = requests.post(url, data=data, timeout=REQUEST_TIMEOUT)
         self.last_status_code = res.status_code
+        self.last_retry_after = None
+        if res.status_code == 429:
+            try:
+                self.last_retry_after = (
+                    res.json().get("parameters", {}).get("retry_after")
+                )
+            except ValueError:
+                pass
 
         log(
             '[telegram_lib]',

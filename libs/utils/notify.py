@@ -1,3 +1,5 @@
+import time
+
 import requests
 
 from libs.handler.discord_handler import DiscordHandler
@@ -11,6 +13,9 @@ from libs.utils.tools import (
     send_exception_log,
 )
 
+# Longest rate-limit wait we accept before giving up on a recipient
+MAX_RETRY_AFTER = 30
+
 
 def send_notify_by_type(notifier_type, data, title, url, channel_title):
     """Send to every recipient of one notifier type.
@@ -23,11 +28,26 @@ def send_notify_by_type(notifier_type, data, title, url, channel_title):
         if handler.send_message(user, message):
             return True
 
-        # Not found won't recover with a different message
-        if handler.last_status_code == 404:
+        status_code = handler.last_status_code
+
+        if status_code == 429:
+            retry_after = handler.last_retry_after
+            if retry_after is not None and retry_after <= MAX_RETRY_AFTER:
+                time.sleep(retry_after)
+                if handler.send_message(user, message):
+                    return True
             send_exception_log(
                 f"[main] {notifier_type.capitalize()} Message Sent Failed"
-                f" (404, skip fallback)"
+                f" (429, retry_after={retry_after})"
+            )
+            return False
+
+        # Not found won't recover with a different message, and neither will
+        # other errors; only a bad request (e.g. broken HTML) may
+        if status_code != 400:
+            send_exception_log(
+                f"[main] {notifier_type.capitalize()} Message Sent Failed"
+                f" ({status_code}, skip fallback)"
             )
             return False
 

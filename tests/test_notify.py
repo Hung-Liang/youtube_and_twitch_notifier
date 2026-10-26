@@ -93,3 +93,55 @@ def test_marked_when_no_recipient_configured(monkeypatch, handler, alerts):
     run_notify(monkeypatch, telegram_config(), [make_result(marked)])
 
     assert marked == [True]
+
+
+def test_fallback_only_on_bad_request(monkeypatch, handler, alerts):
+    FakeHandler.replies = {"a": 400, "b": 500}
+
+    run_notify(monkeypatch, telegram_config("a", "b"), [make_result([])])
+
+    assert [user for user, _ in handler[0].sent] == ["a", "a", "b"]
+
+
+def test_rate_limit_waits_then_resends_same_message(
+    monkeypatch, handler, alerts
+):
+    waits = []
+    monkeypatch.setattr(notify.time, "sleep", waits.append)
+
+    replies = iter([429, True])
+
+    def send_message(self, user, message):
+        self.sent.append((user, message))
+        reply = next(replies)
+        self.last_status_code = 200 if reply is True else reply
+        self.last_retry_after = 5
+        return reply is True
+
+    monkeypatch.setattr(FakeHandler, "send_message", send_message)
+    marked = []
+
+    run_notify(monkeypatch, telegram_config("a"), [make_result(marked)])
+
+    assert waits == [5]
+    sent = handler[0].sent
+    assert len(sent) == 2 and sent[0] == sent[1]
+    assert marked == [True]
+
+
+def test_rate_limit_too_long_is_not_waited(monkeypatch, handler, alerts):
+    waits = []
+    monkeypatch.setattr(notify.time, "sleep", waits.append)
+
+    def send_message(self, user, message):
+        self.sent.append((user, message))
+        self.last_status_code = 429
+        self.last_retry_after = notify.MAX_RETRY_AFTER + 1
+        return False
+
+    monkeypatch.setattr(FakeHandler, "send_message", send_message)
+
+    run_notify(monkeypatch, telegram_config("a"), [make_result([])])
+
+    assert waits == []
+    assert len(handler[0].sent) == 1
