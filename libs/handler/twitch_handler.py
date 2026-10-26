@@ -46,33 +46,6 @@ class TwitchHandler:
         }
         return headers
 
-    def get_stream_info(self, username: str):
-        url = f"{self.base_url}streams"
-        params = {"user_login": username}
-        response = requests.get(
-            url,
-            headers=self.headers,
-            params=params,
-            timeout=REQUEST_TIMEOUT,
-        )
-
-        if response.status_code == 200:
-            data = response.json()
-            streams = data.get("data", [])
-            log(f"Twitch Stream Info: {streams}")
-            log(data)
-            if streams:
-                return {
-                    "is_live": True,
-                    "title": streams[0]["title"],
-                    "stream_id": streams[0]["id"],
-                }
-            return {"is_live": False, "title": None, 'stream_id': None}
-        else:
-            raise Exception(
-                f"Twitch API Error: {response.status_code} {response.text}"
-            )
-
     def get_stream_infos(self, usernames: list):
         url = f"{self.base_url}streams"
         params = {"user_login": usernames}

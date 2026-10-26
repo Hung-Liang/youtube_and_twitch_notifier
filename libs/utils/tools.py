@@ -254,7 +254,6 @@ def get_live_title_and_url(
 
     if channel_id:
         ignore_json = Path(group_path, f"{channel_id}.json")
-        # migrate_playlist_ignore_to_channel(group, channel_id, upload_id)
     else:
         ignore_json = Path(group_path, f"{upload_id}.json")
 
@@ -353,38 +352,6 @@ def get_multiple_twitch_title_and_url(channel_ids, group):
     return results
 
 
-def get_twitch_title_and_url(channel_id, group):
-    """Get Live Title, URL, and Channel Title from the selected channel.
-
-    Args:
-        channel_id (str): Channel ID
-        group (str): Group
-
-    Returns:
-        tuple: (Live Title, URL, Channel Title) if live,
-            else (None, None, None)
-    """
-    stream_info = TwitchHandler().get_stream_info(channel_id)
-    if not stream_info['is_live']:
-        return None, None, None
-
-    group_path = Path(IGNORE_PATH, group)
-    group_path.mkdir(parents=True, exist_ok=True)
-
-    ignore_json = Path(group_path, f"{channel_id}.json")
-
-    ignore_list = load_ignore_json(ignore_json)
-    stream_id = stream_info['stream_id']
-
-    if stream_id in ignore_list:
-        return None, None, None
-
-    live_title = stream_info['title']
-    update_ignore_json(ignore_json, ignore_list, stream_id, live_title)
-
-    return live_title, f"https://www.twitch.tv/{channel_id}", channel_id
-
-
 def load_ignore_json(json_path):
     """Load Ignore Json
 
@@ -413,28 +380,6 @@ def update_ignore_json(json_path, ignore_list, key, value):
     """
     ignore_list[key] = value
     save_json(json_path, ignore_list)
-
-
-def migrate_playlist_ignore_to_channel(group, channel_id, upload_id):
-    """Migrate playlist-based ignore files to channel-based ignore files.
-
-    Args:
-        group (str): Group name.
-        channel_id (str): Channel ID.
-        upload_id (str): Upload playlist ID.
-    """
-    group_path = Path(IGNORE_PATH, group)
-
-    old_ignore_json = Path(group_path, f"{upload_id}.json")
-    new_ignore_json = Path(group_path, f"{channel_id}.json")
-
-    # If old file exists and new file doesn't exist, migrate
-    if old_ignore_json.exists() and not new_ignore_json.exists():
-        old_ignore_list = load_ignore_json(old_ignore_json)
-        save_json(new_ignore_json, old_ignore_list)
-
-        # Optionally remove old file after migration
-        # old_ignore_json.unlink()  # Uncomment if you want to delete old files
 
 
 def create_empty_json(json_path):
