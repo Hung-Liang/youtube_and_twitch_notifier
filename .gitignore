@@ -4,3 +4,6 @@ log/
 test.*
 **/__pycache__/
 libs/config.py
+backup/
+libs/dev_config.py
+update_config.ps1
