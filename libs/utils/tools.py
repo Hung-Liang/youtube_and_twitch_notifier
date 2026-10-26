@@ -47,8 +47,13 @@ def save_json(path, data):
         `path`: File path
         `data`: Json data
     """
-    with open(path, 'w', encoding='utf-8') as f:
+    # Write to a temp file then swap, so a crash never leaves a broken file
+    tmp_path = Path(f"{path}.tmp")
+    with open(tmp_path, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp_path, path)
 
 
 def get_message(notifier_type, title, url, channel_title, word_list):
