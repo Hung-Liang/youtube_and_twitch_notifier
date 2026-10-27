@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from libs.handler.telegram_handler import TelegramHandler
 from libs.handler.twitch_handler import TwitchHandler
 from libs.handler.youtube_handler import YoutubeHandler
-from libs.utils.file_path import IGNORE_PATH, LOG_PATH
+from libs.utils.file_path import IGNORE_PATH, LOG_PATH, UPCOMING_PATH
 from libs.utils.logger import get_log_filename, log
 
 load_dotenv()
@@ -18,6 +18,9 @@ load_dotenv()
 TELEGRAM_ADMIN_ID = os.environ.get("telegram_admin_id")
 
 TELEGRAM_MESSAGE_LIMIT = 4096
+
+# Max maxResults for playlistItems and max IDs per videos request
+YOUTUBE_MAX_RESULTS = 50
 
 
 def load_json(path):
@@ -251,6 +254,34 @@ def get_multiple_live_title_and_url(upload_ids, broadcast_types, group):
     return results
 
 
+def fetch_video_info(video_ids, video_info_cache):
+    """Fetch video info into the cache, batched to save quota.
+
+    Args:
+        `video_ids`: Video IDs to fetch.
+        `video_info_cache`: Video info keyed by ID, updated in place.
+
+    Returns:
+        IDs a successful response left out, e.g. deleted or private videos.
+    """
+    gone_ids = set()
+
+    for start in range(0, len(video_ids), YOUTUBE_MAX_RESULTS):
+        chunk = video_ids[start:start + YOUTUBE_MAX_RESULTS]
+        video_info = YoutubeHandler().get_video_info(",".join(chunk))
+        # A failed request says nothing about whether the videos still exist
+        if video_info is None:
+            continue
+
+        for item in video_info.get("items", []):
+            video_info_cache[item["id"]] = item
+        gone_ids.update(
+            video_id for video_id in chunk if video_id not in video_info_cache
+        )
+
+    return gone_ids
+
+
 def get_live_title_and_url(
     upload_id,
     group,
@@ -258,9 +289,11 @@ def get_live_title_and_url(
     max_results=3,
     is_member_only=False,
     channel_id=None,
-    video_info_cache=None,
 ):
     """Get Live Title, URL, and Channel Title from the selected channel.
+
+    Upcoming videos are remembered and polled by ID until they go live,
+    since newer uploads can push them out of the recent playlist items.
 
     Args:
         upload_id (str): Upload Playlist ID of the selected channel.
@@ -269,20 +302,11 @@ def get_live_title_and_url(
         max_results (int): Maximum results to fetch.
         is_member_only (bool): Whether this is a member-only playlist.
         channel_id (str): Original channel ID for shared ignore tracking.
-        video_info_cache (dict): Video info already fetched, keyed by ID.
 
     Returns:
         list: (Live Title, URL, Channel Title, Mark Notified) per video;
             call Mark Notified after sending to skip it next time.
     """
-    videos = YoutubeHandler().find_recent_video(
-        upload_id, max_results=max_results
-    )
-    if not videos:
-        log("[main]", f"No videos found for upload_id: {upload_id}")
-        return []
-    video_ids = [video["contentDetails"]["videoId"] for video in videos]
-
     group_path = Path(IGNORE_PATH, group)
     group_path.mkdir(parents=True, exist_ok=True)
 
@@ -293,25 +317,77 @@ def get_live_title_and_url(
 
     ignore_list = load_ignore_json(ignore_json)
 
-    if video_info_cache is None:
-        video_info_cache = {}
+    upcoming_path = Path(UPCOMING_PATH, group)
+    upcoming_path.mkdir(parents=True, exist_ok=True)
+    # Keyed by playlist so a member-only stream keeps its title prefix
+    upcoming_json = Path(upcoming_path, f"{upload_id}.json")
+    create_empty_json(upcoming_json)
+    tracked = load_json(upcoming_json)
 
-    # Fetch all uncached videos in one request to save quota
-    missing_ids = [
+    video_info_cache = {}
+    video_ids = []
+
+    while True:
+        videos = YoutubeHandler().find_recent_video(
+            upload_id, max_results=max_results
+        )
+        if not videos:
+            log("[main]", f"No videos found for upload_id: {upload_id}")
+            break
+        video_ids = [video["contentDetails"]["videoId"] for video in videos]
+
+        fetch_video_info(
+            [
+                video_id
+                for video_id in video_ids
+                if video_id not in ignore_list
+                and video_id not in video_info_cache
+            ],
+            video_info_cache,
+        )
+
+        upcoming = sum(
+            1
+            for video_id in video_ids
+            if video_id not in ignore_list
+            and video_id in video_info_cache
+            and video_info_cache[video_id]["snippet"].get(
+                "liveBroadcastContent"
+            ) == "upcoming"
+        )
+
+        # Older videos were already seen by earlier runs, but a batch of
+        # newly scheduled streams may hide ones that were never seen
+        if upcoming < max_results or max_results >= YOUTUBE_MAX_RESULTS:
+            break
+
+        log("[main]", "All videos are upcoming")
+        max_results = min(max_results + 3, YOUTUBE_MAX_RESULTS)
+
+    tracked_ids = [
         video_id
-        for video_id in video_ids
-        if video_id not in ignore_list and video_id not in video_info_cache
+        for video_id in tracked
+        if video_id not in video_ids and video_id not in ignore_list
     ]
-    if missing_ids:
-        video_info = YoutubeHandler().get_video_info(",".join(missing_ids))
-        for item in (video_info or {}).get("items", []):
-            video_info_cache[item["id"]] = item
+    gone_ids = fetch_video_info(
+        [
+            video_id
+            for video_id in tracked_ids
+            if video_id not in video_info_cache
+        ],
+        video_info_cache,
+    )
+
+    # Notified videos are dropped here, on the run after they were sent
+    new_tracked = {
+        video_id: title
+        for video_id, title in tracked.items()
+        if video_id not in ignore_list and video_id not in gone_ids
+    }
 
     results = []
 
-    upcoming = 0
-
-    for video_id in video_ids:
+    for video_id in video_ids + tracked_ids:
         if video_id in ignore_list:
             continue
 
@@ -327,8 +403,13 @@ def get_live_title_and_url(
         )
 
         if broadcast_status == "upcoming":
-            upcoming += 1
+            new_tracked[video_id] = snippet["title"]
             continue
+
+        # Wanted videos stay tracked until notified, so a failed delivery is
+        # retried even after they leave the recent playlist items
+        if broadcast_status not in broadcast_types:
+            new_tracked.pop(video_id, None)
 
         if broadcast_status in broadcast_types:
             live_title = snippet["title"]
@@ -348,17 +429,8 @@ def get_live_title_and_url(
                 )
             )
 
-    if upcoming == max_results:
-        log("[main]", "All videos are upcoming")
-        return get_live_title_and_url(
-            upload_id,
-            group,
-            broadcast_types,
-            max_results + 3,
-            is_member_only,
-            channel_id,
-            video_info_cache,
-        )
+    if new_tracked != tracked:
+        save_json(upcoming_json, new_tracked)
 
     return results
 
