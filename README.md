@@ -90,9 +90,9 @@ APP_ENV=""
 
 ## How to run
 
-- You need to have python installed.
-- You need to install the requirements by running `pip install -r requirements.txt`.
-- You need to run the `main.py` file.
+- You need to have [uv](https://docs.astral.sh/uv/) installed.
+- You need to install the dependencies from `uv.lock` by running `uv sync --no-dev`.
+- You need to run the `main.py` file with `uv run main.py`.
 
 ## How it works
 
@@ -126,11 +126,11 @@ APP_ENV=""
 
 ## Running tests
 
-- Tests run in a local [uv](https://docs.astral.sh/uv/) virtual environment on Python 3.12, the same version as the Docker image.
+- Tests run in a local [uv](https://docs.astral.sh/uv/) virtual environment on Python 3.12, with the same Python version and locked dependencies as the Docker image.
+- To upgrade dependencies, run `uv lock --upgrade` and commit the updated `uv.lock`.
 
 ```bash
-uv venv --python 3.12
-uv pip install -r requirements-dev.txt
+uv sync
 uv run pytest
 ```
 

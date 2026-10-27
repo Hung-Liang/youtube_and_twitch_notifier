@@ -94,9 +94,9 @@ APP_ENV=""
 
 ## 如何運行
 
-1. 安裝 Python。  
-2. 執行 `pip install -r requirements.txt` 安裝相依套件。  
-3. 執行 `main.py` 啟動程式。  
+1. 安裝 [uv](https://docs.astral.sh/uv/)。  
+2. 執行 `uv sync --no-dev` 依 `uv.lock` 安裝相依套件。  
+3. 執行 `uv run main.py` 啟動程式。  
 
 ## 運作方式
 
@@ -129,11 +129,11 @@ APP_ENV=""
 
 ## 執行測試
 
-- 測試使用本機的 [uv](https://docs.astral.sh/uv/) 虛擬環境，Python 版本為 3.12，與 Docker image 相同。
+- 測試使用本機的 [uv](https://docs.astral.sh/uv/) 虛擬環境，Python 版本與鎖定的相依套件都與 Docker image 相同。
+- 升級相依套件時執行 `uv lock --upgrade`，並提交更新後的 `uv.lock`。
 
 ```bash
-uv venv --python 3.12
-uv pip install -r requirements-dev.txt
+uv sync
 uv run pytest
 ```
 

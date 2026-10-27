@@ -1,6 +1,0 @@
-APScheduler == 3.6.3
-python_dotenv == 0.21.0
-pytz == 2021.3
-requests == 2.32.4
-# APScheduler 3.6.3 imports pkg_resources, removed in setuptools 81
-setuptools < 81

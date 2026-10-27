@@ -16,10 +16,15 @@ ARG APP_UID=1000
 ARG APP_GID=1000
 RUN groupadd -g ${APP_GID} app \
     && useradd -m -u ${APP_UID} -g ${APP_GID} -s /bin/bash app
-RUN python -m venv /opt/venv
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_NO_CACHE=1 \
+    UV_LINK_MODE=copy
 WORKDIR /app
-COPY requirements.txt ./
-RUN pip install -r requirements.txt
+COPY pyproject.toml uv.lock .python-version ./
+# uv is mounted for this step only, so it stays out of the final image
+RUN --mount=from=ghcr.io/astral-sh/uv:0.13.5,source=/uv,target=/bin/uv \
+    uv sync --frozen --no-dev
 COPY main.py ./
 COPY libs ./libs
 ENV TZ=Asia/Taipei
