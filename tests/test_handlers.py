@@ -240,6 +240,35 @@ def test_twitch_refreshes_token_on_401(twitch):
     ]
 
 
+def test_twitch_splits_user_logins_into_batches(twitch, monkeypatch):
+    requested = []
+
+    def get(url, headers, params, timeout):
+        requested.append(params)
+        return FakeResponse(
+            200,
+            {
+                "data": [
+                    {
+                        "title": "live!",
+                        "id": f"s{params['user_login'][0]}",
+                        "user_login": params["user_login"][0],
+                        "user_name": "Chu",
+                    }
+                ]
+            },
+        )
+
+    monkeypatch.setattr(twitch_handler.requests, "get", get)
+    usernames = [f"u{i}" for i in range(250)]
+
+    streams = twitch_handler.TwitchHandler().get_stream_infos(usernames)
+
+    assert [len(p["user_login"]) for p in requested] == [100, 100, 50]
+    assert [p["first"] for p in requested] == [100, 100, 50]
+    assert [s["user_login"] for s in streams] == ["u0", "u100", "u200"]
+
+
 def test_twitch_error_raises(twitch, monkeypatch):
     monkeypatch.setattr(
         twitch_handler.requests,

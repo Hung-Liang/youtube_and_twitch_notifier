@@ -10,6 +10,9 @@ load_dotenv()
 
 REQUEST_TIMEOUT = 10
 
+# Helix /streams accepts at most 100 user_login values per request
+MAX_USER_LOGINS = 100
+
 # Shared across instances since app access tokens are valid for ~60 days
 _access_token = None
 _access_token_lock = threading.Lock()
@@ -67,7 +70,16 @@ class TwitchHandler:
         )
 
     def get_stream_infos(self, usernames: list):
-        params = {"user_login": usernames}
+        stream_infos = []
+        for start in range(0, len(usernames), MAX_USER_LOGINS):
+            stream_infos += self.get_stream_infos_batch(
+                usernames[start:start + MAX_USER_LOGINS]
+            )
+        return stream_infos
+
+    def get_stream_infos_batch(self, usernames: list):
+        # Without `first`, Helix returns at most 20 live streams
+        params = {"user_login": usernames, "first": len(usernames)}
         response = self.request_streams(params)
 
         if response.status_code == 401:
