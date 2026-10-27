@@ -73,7 +73,11 @@ def main(argv=None):
 
     send_service_start_notification()
 
-    scheduler = BlockingScheduler(timezone=TIMEZONE)
+    # Default misfire grace is 1s, so a slightly late wakeup skips the run
+    scheduler = BlockingScheduler(
+        timezone=TIMEZONE,
+        job_defaults={"misfire_grace_time": 30, "coalesce": True},
+    )
     scheduler.add_listener(on_job_error, EVENT_JOB_ERROR)
 
     schedule_group_jobs(scheduler, "youtube", youtube_groups)
