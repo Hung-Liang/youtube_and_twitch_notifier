@@ -499,6 +499,14 @@ def test_failed_youtube_baseline_is_retried_before_notifying(
     ]
 
 
+def test_youtube_baseline_succeeds_on_empty_playlist(monkeypatch):
+    patch_youtube(monkeypatch, {"UU1": ["v1"]}, {})
+
+    assert tools.baseline_youtube_group(
+        {"UC1": "UU1", "UC1_member": "UUMO1"}, "g"
+    ) == []
+
+
 def test_youtube_baseline_exception_marks_group_pending(
     monkeypatch, admin_alerts
 ):

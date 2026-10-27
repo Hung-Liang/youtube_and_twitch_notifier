@@ -38,6 +38,16 @@ def is_quota_exceeded(res):
     return any(error.get("reason") in QUOTA_ERROR_REASONS for error in errors)
 
 
+def is_playlist_not_found(res):
+    if res.status_code != 404:
+        return False
+    try:
+        errors = res.json().get("error", {}).get("errors", [])
+    except ValueError:
+        return False
+    return any(error.get("reason") == "playlistNotFound" for error in errors)
+
+
 class YoutubeHandler:
     """Youtube Handler
 
@@ -133,7 +143,7 @@ class YoutubeHandler:
             `max_results`: Max results.
 
         Returns:
-            Recent video.
+            Recent video, or None if the request failed.
         """
 
         url = (
@@ -152,6 +162,9 @@ class YoutubeHandler:
 
         if res.status_code == 200:
             return json.loads(res.text)["items"]
+        # Channels without memberships have no member-only playlist
+        elif is_playlist_not_found(res):
+            return []
         else:
             return None
 

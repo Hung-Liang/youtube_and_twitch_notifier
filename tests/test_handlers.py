@@ -141,6 +141,27 @@ def test_youtube_error_responses_return_none(monkeypatch):
     assert handler.get_video_info("v1") is None
 
 
+def test_youtube_missing_playlist_returns_empty(monkeypatch):
+    body = {"error": {"errors": [{"reason": "playlistNotFound"}]}}
+    monkeypatch.setattr(
+        youtube_handler.requests,
+        "get",
+        lambda url, headers, timeout: FakeResponse(404, body),
+    )
+
+    assert youtube_handler.YoutubeHandler().find_recent_video("UUMO1") == []
+
+
+def test_youtube_other_not_found_returns_none(monkeypatch):
+    monkeypatch.setattr(
+        youtube_handler.requests,
+        "get",
+        lambda url, headers, timeout: FakeResponse(404, {"error": {}}),
+    )
+
+    assert youtube_handler.YoutubeHandler().find_recent_video("UU1") is None
+
+
 def test_youtube_missing_token_raises(monkeypatch):
     monkeypatch.delenv("youtube_api_token")
 
