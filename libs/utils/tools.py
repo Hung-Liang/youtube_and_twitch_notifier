@@ -437,7 +437,9 @@ def get_playlist_results(playlist, video_info_cache, broadcast_types, group):
         )
 
     if skipped:
-        add_ignore_entries(playlist["ignore_json"], skipped)
+        add_ignore_entries(
+            playlist["ignore_json"], dict(reversed(skipped.items()))
+        )
 
     return results
 
@@ -474,7 +476,9 @@ def write_youtube_baseline(playlist, video_info_cache, gone_ids):
         entries[video_id] = "[baseline] " + snippet["title"]
 
     if entries:
-        add_ignore_entries(playlist["ignore_json"], entries)
+        add_ignore_entries(
+            playlist["ignore_json"], dict(reversed(entries.items()))
+        )
 
     return True
 
@@ -654,9 +658,12 @@ def update_ignore_json(json_path, ignore_list, key, value):
 def add_ignore_entries(json_path, entries):
     """Merge entries into the ignore json.
 
+    Trimming keeps the last written entries, so pass them oldest first;
+    playlist items come newest first and must be reversed.
+
     Args:
         `json_path`: Ignore Json Path
-        `entries`: Titles keyed by Video ID or Stream ID
+        `entries`: Titles keyed by Video ID or Stream ID, oldest first
     """
     ignore_list = load_ignore_json(json_path)
     ignore_list.update(entries)

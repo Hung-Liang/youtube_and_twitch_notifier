@@ -440,6 +440,28 @@ def test_youtube_baseline_ignores_all_but_upcoming(monkeypatch, isolate):
     ]
 
 
+def test_youtube_baseline_writes_oldest_first(monkeypatch, isolate):
+    patch_youtube(monkeypatch, ["new", "mid", "old"], {
+        video_id: make_video(video_id, "none")
+        for video_id in ("new", "mid", "old")
+    })
+
+    tools.baseline_youtube_group({"UC1": "UU1"}, "g")
+
+    # Trimming keeps the last written entries, so the newest must be last
+    assert list(read_ignore(isolate)) == ["old", "mid", "new"]
+
+
+def test_skipped_videos_are_written_oldest_first(monkeypatch, isolate):
+    patch_youtube(monkeypatch, ["new", "old"], {
+        "new": make_video("new", "none"),
+        "old": make_video("old", "none"),
+    })
+
+    assert check_youtube(["live"]) == []
+    assert list(read_ignore(isolate)) == ["old", "new"]
+
+
 def test_youtube_baseline_merges_into_existing_ignore(monkeypatch, isolate):
     group_path = isolate / "ignore" / "g"
     group_path.mkdir()
