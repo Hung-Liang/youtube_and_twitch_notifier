@@ -48,3 +48,13 @@ def test_uneven_interval_and_empty_broadcast_types_are_warnings():
 
     assert errors == []
     assert len(warnings) == 2
+
+
+def test_upcoming_broadcast_type_is_a_warning():
+    group = make_group(broadcast_types=["live", "upcoming"])
+
+    errors, warnings = check_groups("youtube", {"g": group})
+
+    assert errors == []
+    assert len(warnings) == 1
+    assert "'upcoming' has no effect" in warnings[0]

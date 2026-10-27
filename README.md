@@ -63,7 +63,7 @@ twitch_groups = {
 - `interval` is the time in minutes between each check.
   - Use a value that divides 60 (e.g. 1, 2, 3, 5, 10), otherwise polling gaps will be uneven.
 - Run `python main.py --check-config` to validate the config without starting the service.
-- The config is checked at startup: missing or invalid settings stop the service, and an uneven `interval` or empty `broadcast_types` only logs a warning.
+- The config is checked at startup: missing or invalid settings stop the service, and an uneven `interval`, empty `broadcast_types` or `upcoming` in `broadcast_types` only logs a warning.
 
 ## Env file
 

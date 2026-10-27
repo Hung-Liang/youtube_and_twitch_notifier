@@ -64,6 +64,12 @@ def check_groups(platform, groups):
                             f"{where}['broadcast_types'] has unknown value"
                             f" {broadcast_type!r}"
                         )
+                if "upcoming" in broadcast_types:
+                    warnings.append(
+                        f"{where}['broadcast_types'] 'upcoming' has no"
+                        " effect, waiting rooms are notified as 'live'"
+                        " once they start"
+                    )
 
     return errors, warnings
 

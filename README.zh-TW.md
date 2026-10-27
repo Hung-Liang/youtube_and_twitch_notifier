@@ -65,7 +65,7 @@ twitch_groups = {
 - `interval` 指每次檢查的間隔時間（以分鐘計算）。  
   - 建議設定能整除 60 的數值（如 1、2、3、5、10），否則檢查間隔會不平均。  
 - 執行 `python main.py --check-config` 可只檢查 config，不啟動服務。  
-- 啟動時會檢查 config：缺少或錯誤的設定會讓服務無法啟動；`interval` 無法整除 60 或 `broadcast_types` 為空只會記錄警告。  
+- 啟動時會檢查 config：缺少或錯誤的設定會讓服務無法啟動；`interval` 無法整除 60、`broadcast_types` 為空或包含 `upcoming` 只會記錄警告。  
 
 ## 設定 `.env` 檔案
 
