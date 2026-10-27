@@ -233,6 +233,29 @@ def test_no_videos_returns_empty(monkeypatch):
     assert check_youtube(["live"]) == []
 
 
+def test_failed_playlist_does_not_block_the_group(monkeypatch):
+    patch_youtube(monkeypatch, ["v1"], {"v1": make_video("v1", "live")})
+    find_recent_video = tools.YoutubeHandler.find_recent_video
+
+    def flaky(self, playlist_id, **kwargs):
+        if playlist_id == "UU2":
+            return None
+        return find_recent_video(self, playlist_id, **kwargs)
+
+    monkeypatch.setattr(tools.YoutubeHandler, "find_recent_video", flaky)
+    upload_ids = {"UC1": "UU1", "UC2": "UU2"}
+
+    assert tools.baseline_youtube_group(upload_ids, "g") == ["UU2"]
+
+    patch_youtube(monkeypatch, ["v2"], {"v2": make_video("v2", "live")})
+    find_recent_video = tools.YoutubeHandler.find_recent_video
+    monkeypatch.setattr(tools.YoutubeHandler, "find_recent_video", flaky)
+
+    assert [r[1] for r in check_youtube(["live"], upload_ids)] == [
+        "https://www.youtube.com/watch?v=v2"
+    ]
+
+
 def test_ignored_video_info_is_not_fetched(monkeypatch, isolate):
     patch_youtube(monkeypatch, ["v1"], {"v1": make_video("v1", "live")})
     group_path = isolate / "ignore" / "g"

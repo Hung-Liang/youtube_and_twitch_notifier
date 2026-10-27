@@ -72,7 +72,7 @@ class YoutubeHandler:
             `url`: Request url without api key.
 
         Returns:
-            The last response.
+            The last response, or None on a network error.
         """
         global _quota_alert_day
 
@@ -89,11 +89,17 @@ class YoutubeHandler:
 
         for index, token in enumerate(tokens):
             # Pass the key via header so it never appears in URLs or tracebacks
-            res = requests.get(
-                url,
-                headers={"X-goog-api-key": token},
-                timeout=REQUEST_TIMEOUT,
-            )
+            try:
+                res = requests.get(
+                    url,
+                    headers={"X-goog-api-key": token},
+                    timeout=REQUEST_TIMEOUT,
+                )
+            # Network errors are usually transient, so callers treat this as
+            # a failed request and retry next run instead of failing the job
+            except requests.RequestException as err:
+                log('[youtube_lib]', f'request failed: {err!r}')
+                return None
             if not is_quota_exceeded(res):
                 return res
 
@@ -154,6 +160,8 @@ class YoutubeHandler:
         )
 
         res = self.request(url)
+        if res is None:
+            return None
 
         log(
             '[youtube_lib]',
@@ -185,6 +193,8 @@ class YoutubeHandler:
         )
 
         res = self.request(url)
+        if res is None:
+            return None
 
         log(
             '[youtube_lib]',

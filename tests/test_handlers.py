@@ -1,6 +1,7 @@
 import json
 
 import pytest
+import requests
 
 from libs.handler import (
     discord_handler,
@@ -137,6 +138,18 @@ def test_youtube_error_responses_return_none(monkeypatch):
     )
     handler = youtube_handler.YoutubeHandler()
 
+    assert handler.find_recent_video("UU1") is None
+    assert handler.get_video_info("v1") is None
+
+
+def test_youtube_network_error_returns_none(monkeypatch):
+    def get(url, headers, timeout):
+        raise requests.exceptions.SSLError("EOF occurred")
+
+    monkeypatch.setattr(youtube_handler.requests, "get", get)
+    handler = youtube_handler.YoutubeHandler()
+
+    assert handler.request("https://yt") is None
     assert handler.find_recent_video("UU1") is None
     assert handler.get_video_info("v1") is None
 
