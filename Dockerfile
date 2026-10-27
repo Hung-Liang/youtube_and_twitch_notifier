@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# Base layers mirror anki-telegram so both images share them on the server
+# Base and apt layers mirror anki-telegram so both images share them on the server; UID/GID match it too
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -12,8 +12,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends tzdata \
     && rm -rf /var/lib/apt/lists/*
-ARG APP_UID=1001
-ARG APP_GID=1001
+ARG APP_UID=1000
+ARG APP_GID=1000
 RUN groupadd -g ${APP_GID} app \
     && useradd -m -u ${APP_UID} -g ${APP_GID} -s /bin/bash app
 RUN python -m venv /opt/venv
