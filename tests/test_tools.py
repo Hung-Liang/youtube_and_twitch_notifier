@@ -64,13 +64,20 @@ def test_save_json_leaves_no_temp_file(tmp_path):
     assert [p.name for p in folder.iterdir()] == ["a.json"]
 
 
-def test_load_ignore_json_keeps_last_50_when_over_100(tmp_path):
+def test_load_ignore_json_keeps_last_150_when_over_200(tmp_path):
     path = tmp_path / "ignore.json"
-    tools.save_json(path, {str(i): i for i in range(101)})
+    tools.save_json(path, {str(i): i for i in range(201)})
 
     ignore_list = tools.load_ignore_json(path)
 
-    assert list(ignore_list) == [str(i) for i in range(51, 101)]
+    assert list(ignore_list) == [str(i) for i in range(51, 201)]
+
+
+def test_load_ignore_json_keeps_all_at_200(tmp_path):
+    path = tmp_path / "ignore.json"
+    tools.save_json(path, {str(i): i for i in range(200)})
+
+    assert len(tools.load_ignore_json(path)) == 200
 
 
 def test_live_video_is_returned_once(monkeypatch):

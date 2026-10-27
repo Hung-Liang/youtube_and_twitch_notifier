@@ -22,6 +22,11 @@ TELEGRAM_MESSAGE_LIMIT = 4096
 # Max maxResults for playlistItems and max IDs per videos request
 YOUTUBE_MAX_RESULTS = 50
 
+# Upload and member-only playlists share one ignore file, and entries are
+# trimmed in write order, so keep a buffer over the 2 x 50 checked videos
+IGNORE_MAX_SIZE = 200
+IGNORE_KEEP_SIZE = 150
+
 
 def load_json(path):
     """Load Json from Select File
@@ -497,8 +502,8 @@ def load_ignore_json(json_path):
 
     ignore_list = load_json(json_path)
 
-    if len(ignore_list) > 100:
-        ignore_list = dict(list(ignore_list.items())[-50:] or ignore_list)
+    if len(ignore_list) > IGNORE_MAX_SIZE:
+        ignore_list = dict(list(ignore_list.items())[-IGNORE_KEEP_SIZE:])
 
     return ignore_list
 
