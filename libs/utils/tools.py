@@ -2,7 +2,6 @@ import html
 import json
 import os
 import random
-import threading
 from pathlib import Path
 
 import requests
@@ -11,18 +10,12 @@ from dotenv import load_dotenv
 from libs.handler.telegram_handler import TelegramHandler
 from libs.handler.twitch_handler import TwitchHandler
 from libs.handler.youtube_handler import YoutubeHandler
-from libs.utils.file_path import (
-    IGNORE_PATH,
-    LOG_PATH,
-    UPLOAD_PLAYLIST_JSON_PATH,
-)
+from libs.utils.file_path import IGNORE_PATH, LOG_PATH
 from libs.utils.logger import get_log_filename, log
 
 load_dotenv()
 
 TELEGRAM_ADMIN_ID = os.environ.get("telegram_admin_id")
-
-UPLOAD_PLAYLIST_LOCK = threading.Lock()
 
 TELEGRAM_MESSAGE_LIMIT = 4096
 
@@ -169,24 +162,12 @@ def get_upload_id(channel_id):
     Returns:
         A Upload Playlist ID of Select Channel
     """
-    # Jobs run in a thread pool and may read/write this file at once
-    with UPLOAD_PLAYLIST_LOCK:
-        if not Path(UPLOAD_PLAYLIST_JSON_PATH).exists():
-            save_json(UPLOAD_PLAYLIST_JSON_PATH, {})
+    # The UC -> UU mapping is not officially documented, but saves an API call
+    if channel_id.startswith("UC"):
+        return "UU" + channel_id[2:]
 
-        upload_playlist = load_json(UPLOAD_PLAYLIST_JSON_PATH)
-
-        if channel_id in upload_playlist:
-            return upload_playlist[channel_id]
-        else:
-            upload_id = YoutubeHandler().get_upload_playlist_id(channel_id)
-
-            if upload_id:
-                upload_playlist[channel_id] = upload_id
-                save_json(UPLOAD_PLAYLIST_JSON_PATH, upload_playlist)
-                return upload_id
-            else:
-                return None
+    log("[main]", f"Invalid channel id: {channel_id}")
+    return None
 
 
 def get_member_only_id(channel_id):

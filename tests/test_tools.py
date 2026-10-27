@@ -213,31 +213,12 @@ def test_ignored_video_info_is_not_fetched(monkeypatch, isolate):
     assert tools.get_live_title_and_url("UU1", "g", ["live"]) == []
 
 
-def test_get_upload_id_caches_api_result(monkeypatch):
-    calls = []
-
-    def get_upload_playlist_id(self, channel_id):
-        calls.append(channel_id)
-        return "UU" + channel_id[2:]
-
-    monkeypatch.setattr(
-        tools.YoutubeHandler, "get_upload_playlist_id", get_upload_playlist_id
-    )
-
+def test_get_upload_id_derives_from_channel_id():
     assert tools.get_upload_id("UC1") == "UU1"
-    assert tools.get_upload_id("UC1") == "UU1"
-    assert calls == ["UC1"]
 
 
-def test_get_upload_id_does_not_cache_failure(monkeypatch):
-    monkeypatch.setattr(
-        tools.YoutubeHandler,
-        "get_upload_playlist_id",
-        lambda self, channel_id: None,
-    )
-
-    assert tools.get_upload_id("UC1") is None
-    assert tools.load_json(tools.UPLOAD_PLAYLIST_JSON_PATH) == {}
+def test_get_upload_id_rejects_non_uc_channel():
+    assert tools.get_upload_id("XX1") is None
 
 
 def test_get_multiple_upload_id_adds_member_playlist(monkeypatch):

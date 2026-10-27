@@ -108,39 +108,6 @@ class YoutubeHandler:
 
         return res
 
-    def get_upload_playlist_id(self, channel_id):
-        """Get upload playlist id from Youtube.
-
-        Args:
-            `channel_id`: Channel ID.
-            `part`: Part to get.
-
-        Returns:
-            Upload playlist id.
-        """
-
-        url = (
-            "https://www.googleapis.com/youtube/v3/channels?"
-            "id={}&part=contentDetails".format(channel_id)
-        )
-
-        res = self.request(url)
-
-        log(
-            '[youtube_lib]',
-            f'get upload playlist id: {res.status_code} {res.text}',
-        )
-
-        if res.status_code != 200:
-            return None
-
-        items = json.loads(res.text).get("items", [])
-        if not items:
-            log('[youtube_lib]', f'channel not found: {channel_id}')
-            return None
-
-        return items[0]["contentDetails"]["relatedPlaylists"]["uploads"]
-
     def get_member_only_playlist_id(self, channel_id):
         """Get member-only playlist id from Youtube channel.
 
