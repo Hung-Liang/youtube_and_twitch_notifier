@@ -54,7 +54,7 @@ twitch_groups = {
 - You can add as many `channel_ids` as you want under each group.
 - `broadcast_types` is only used for youtube, you can set it to `live`, `upcoming` or `none`.
   - `live`: live stream.
-  - `upcoming`: upcoming stream.
+  - `upcoming`: upcoming stream. It is never notified; a waiting room is notified as `live` once it starts.
   - `none`: normal video or ended stream.
 - You can add as many `recipient_ids` and `webhook_urls` as you want under each notifier type.
 - You can add as many `word_list` as you want under each notifier type.
@@ -94,11 +94,19 @@ APP_ENV=""
 - You need to install the requirements by running `pip install -r requirements.txt`.
 - You need to run the `main.py` file.
 
+## How it works
+
+- On startup, every group records what it shows now as already notified: the latest 50 videos of each youtube playlist except upcoming ones, and the twitch streams that are live.
+  - Only streams and videos that start or appear while the service is running are notified; anything missed during downtime is skipped.
+  - If a startup check fails, the admin is alerted once and the group retries it on its next runs, sending nothing for that playlist or group until it succeeds.
+- Each run checks the latest 50 videos of every youtube playlist; videos of a group are looked up together, 50 per request.
+- Notified and skipped ids are kept in `asset/ignore/{group}/{channel}.json`. The folder is optional: starting with an empty one is safe, so it does not need to move with the deployment.
+
 ## Run with Docker
 
 - Put `.env` in the root folder and `config.py` in the `config` folder, then run `scripts/deploy.sh`.
   - It tags the current image as `chu_yt_notification:prev`, builds a new one, checks the config, and restarts the container.
-- `config/`, `asset/` and `log/` are mounted from the host, so they survive rebuilds.
+- `config/`, `asset/` and `log/` are mounted from the host, so they survive rebuilds. `asset/` can start empty on a new host.
 - After changing the config, run `docker compose restart notifier`.
 - Rollback: `docker tag chu_yt_notification:prev chu_yt_notification:latest && docker compose up -d`.
 

@@ -56,7 +56,7 @@ twitch_groups = {
 - 每個群組內可新增多個 `channel_ids`（頻道 ID）。  
 - `broadcast_types` 只有Youtube會使用到這個參數，可設定 `live`、`upcoming` 和 `none`。  
   - `live`：直播中。  
-  - `upcoming`：即將開播。  
+  - `upcoming`：即將開播。不會發通知，待機台開播後會以 `live` 通知。  
   - `none`：一般上船影片 or 結束直播的影片。
 - `notifier_types`（通知類型）可設定 Telegram 和 Discord。  
 - `recipient_ids` 和 `webhook_urls` 可設定多個接收者或 Webhook 連結。  
@@ -98,11 +98,19 @@ APP_ENV=""
 2. 執行 `pip install -r requirements.txt` 安裝相依套件。  
 3. 執行 `main.py` 啟動程式。  
 
+## 運作方式
+
+- 啟動時，每個群組會把當下看得到的內容視為已通知：YouTube 每個 playlist 最新 50 部影片（upcoming 除外），以及 Twitch 正在直播的台。  
+  - 只會通知服務運行期間開台或上架的內容；停機期間錯過的不會補發。  
+  - 啟動時的檢查失敗會通知 admin 一次，該群組之後每一輪會重試，成功前不會發送該 playlist 或群組的通知。  
+- 每一輪檢查 YouTube 每個 playlist 最新 50 部影片，同一個群組的影片會一起查詢，每 50 部一個 request。  
+- 已通知和略過的 ID 存在 `asset/ignore/{group}/{channel}.json`。這個資料夾可以是空的，搬機器時不用一起搬。  
+
 ## 使用 Docker 運行
 
 - 把 `.env` 放在專案根目錄、`config.py` 放在 `config` 資料夾，然後執行 `scripts/deploy.sh`。  
   - 腳本會先把目前的 image 標記為 `chu_yt_notification:prev`，再 build 新 image、檢查 config，最後重啟容器。  
-- `config/`、`asset/`、`log/` 都從主機 mount 進容器，重新 build 也不會遺失。  
+- `config/`、`asset/`、`log/` 都從主機 mount 進容器，重新 build 也不會遺失。新主機上的 `asset/` 可以是空的。  
 - 修改 config 後執行 `docker compose restart notifier`。  
 - 回滾：`docker tag chu_yt_notification:prev chu_yt_notification:latest && docker compose up -d`。  
 
