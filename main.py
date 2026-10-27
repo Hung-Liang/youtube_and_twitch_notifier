@@ -7,7 +7,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from libs.utils.config_check import check_groups
 from libs.utils.config_loader import load_config
 from libs.utils.logger import TIMEZONE, log
-from libs.utils.notify import send_notify
+from libs.utils.notify import init_baseline, send_notify
 from libs.utils.tools import (
     send_daily_log,
     send_exception_log,
@@ -24,6 +24,16 @@ def schedule_group_jobs(scheduler, platform, group_data):
             minute=f"0-59/{interval}",
             args=[platform, group, config],
         )
+
+
+def init_baselines(youtube_groups, twitch_groups):
+    # The service only notifies streams that start while it is running
+    for platform, groups in (
+        ("youtube", youtube_groups),
+        ("twitch", twitch_groups),
+    ):
+        for group, config in groups.items():
+            init_baseline(platform, group, config)
 
 
 def on_job_error(event):
@@ -72,6 +82,8 @@ def main(argv=None):
     check_config(youtube_groups, twitch_groups)
 
     send_service_start_notification()
+
+    init_baselines(youtube_groups, twitch_groups)
 
     # Default misfire grace is 1s, so a slightly late wakeup skips the run
     scheduler = BlockingScheduler(

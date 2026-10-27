@@ -86,3 +86,33 @@ def test_check_config_flag_fails_on_missing_config(monkeypatch, tmp_path):
     )
 
     assert main.main(["--check-config"]) == 1
+
+
+def test_baselines_run_before_scheduler_starts(monkeypatch):
+    events = []
+
+    class Scheduler(FakeScheduler):
+        def __init__(self, **kwargs):
+            super().__init__()
+
+        def add_listener(self, *args):
+            pass
+
+        def start(self):
+            events.append("start")
+
+    youtube = {"y": {"interval": 5}}
+    twitch = {"t": {"interval": 5}}
+    monkeypatch.setattr(main, "load_config", lambda: (youtube, twitch))
+    monkeypatch.setattr(main, "check_config", lambda *a: None)
+    monkeypatch.setattr(main, "send_service_start_notification", lambda: None)
+    monkeypatch.setattr(
+        main,
+        "init_baseline",
+        lambda platform, group, config: events.append((platform, group)),
+    )
+    monkeypatch.setattr(main, "BlockingScheduler", Scheduler)
+
+    main.main([])
+
+    assert events == [("youtube", "y"), ("twitch", "t"), "start"]

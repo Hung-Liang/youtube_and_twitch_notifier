@@ -250,3 +250,27 @@ def test_youtube_uses_default_broadcast_types(monkeypatch, handler, alerts):
 
     assert seen == {"member": False, "broadcast_types": ["none", "live"]}
     assert handler == []
+
+
+def test_init_baseline_dispatches_by_platform(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        notify,
+        "init_youtube_baseline",
+        lambda upload_ids, group: calls.append(("youtube", upload_ids)),
+    )
+    monkeypatch.setattr(
+        notify,
+        "init_twitch_baseline",
+        lambda channel_ids, group: calls.append(("twitch", channel_ids)),
+    )
+
+    notify.init_baseline(
+        "youtube", "g", {"channel_ids": ["UC1"], "notify_member_only": True}
+    )
+    notify.init_baseline("twitch", "g", {"channel_ids": ["chu"]})
+
+    assert calls == [
+        ("youtube", {"UC1": "UU1", "UC1_member": "UUMO1"}),
+        ("twitch", ["chu"]),
+    ]

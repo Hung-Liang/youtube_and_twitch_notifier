@@ -32,6 +32,10 @@ YOUTUBE_VIDEO_PARTS = "snippet,liveStreamingDetails"
 IGNORE_MAX_SIZE = 200
 IGNORE_KEEP_SIZE = 150
 
+# Keys of YouTube playlists and Twitch groups whose baseline failed; they are
+# not notified until a retry succeeds, so old videos are not sent as new
+_pending_baselines = set()
+
 
 def load_json(path):
     """Load Json from Select File
@@ -234,12 +238,19 @@ def get_multiple_live_title_and_url(upload_ids, broadcast_types, group):
         list: (Live Title, URL, Channel Title, Mark Notified) per video;
             call Mark Notified after sending to skip it next time.
     """
-    playlists, video_info_cache, _ = fetch_playlists(upload_ids, group)
+    playlists, video_info_cache, gone_ids = fetch_playlists(upload_ids, group)
 
     results = []
     seen_urls = set()
 
     for playlist in playlists:
+        key = ("youtube", group, playlist["upload_id"])
+        if key in _pending_baselines:
+            if write_youtube_baseline(playlist, video_info_cache, gone_ids):
+                _pending_baselines.discard(key)
+                log("[baseline]", f"Retry succeeded: {key}")
+            continue
+
         playlist_results = get_playlist_results(
             playlist, video_info_cache, broadcast_types, group
         )
@@ -431,6 +442,128 @@ def get_playlist_results(playlist, video_info_cache, broadcast_types, group):
     return results
 
 
+def write_youtube_baseline(playlist, video_info_cache, gone_ids):
+    """Ignore the new videos of a playlist, except upcoming ones.
+
+    Args:
+        `playlist`: A playlist from `fetch_playlists`
+        `video_info_cache`: Video info keyed by ID
+        `gone_ids`: IDs a successful videos response left out
+
+    Returns:
+        False if a request failed, so nothing was written
+    """
+    if playlist["video_ids"] is None:
+        return False
+
+    entries = {}
+
+    for video_id in playlist["video_ids"]:
+        # Private or scheduled videos are notified if they become public
+        if video_id in gone_ids:
+            continue
+
+        # Its videos request failed, so it may be upcoming
+        if video_id not in video_info_cache:
+            return False
+
+        snippet = video_info_cache[video_id]["snippet"]
+        if snippet.get("liveBroadcastContent", "") == "upcoming":
+            continue
+
+        entries[video_id] = "[baseline] " + snippet["title"]
+
+    if entries:
+        add_ignore_entries(playlist["ignore_json"], entries)
+
+    return True
+
+
+def baseline_youtube_group(upload_ids, group):
+    """Ignore the videos of a group that are visible now.
+
+    Args:
+        `upload_ids`: Upload Playlist IDs keyed by channel key
+        `group`: Group
+
+    Returns:
+        Upload Playlist IDs whose baseline failed
+    """
+    playlists, video_info_cache, gone_ids = fetch_playlists(upload_ids, group)
+
+    return [
+        playlist["upload_id"]
+        for playlist in playlists
+        if not write_youtube_baseline(playlist, video_info_cache, gone_ids)
+    ]
+
+
+def baseline_twitch_group(channel_ids, group):
+    """Ignore the streams of a group that are live now.
+
+    Args:
+        `channel_ids`: Channel IDs
+        `group`: Group
+    """
+    # Helix returns top live streams when user_login is omitted
+    if not channel_ids:
+        return
+
+    for stream_info in TwitchHandler().get_stream_infos(channel_ids):
+        add_ignore_entries(
+            get_ignore_json(group, stream_info["user_login"]),
+            {stream_info["stream_id"]: "[baseline] " + stream_info["title"]},
+        )
+
+
+def init_youtube_baseline(upload_ids, group):
+    """Run the startup baseline of a YouTube group.
+
+    Failed playlists are retried by later runs and not notified until then.
+
+    Args:
+        `upload_ids`: Upload Playlist IDs keyed by channel key
+        `group`: Group
+    """
+    # Raising would exit the service, and every restart would run the
+    # baselines again and burn quota
+    try:
+        failed = baseline_youtube_group(upload_ids, group)
+        reason = "request failed"
+    except Exception as e:
+        failed = list(upload_ids.values())
+        reason = f"{type(e).__name__}: {e}"
+
+    if failed:
+        _pending_baselines.update(
+            ("youtube", group, upload_id) for upload_id in failed
+        )
+        send_exception_log(
+            f"[baseline] YouTube group {group} failed, retry next run"
+            f"\n{reason}\n{', '.join(failed)}"
+        )
+
+
+def init_twitch_baseline(channel_ids, group):
+    """Run the startup baseline of a Twitch group.
+
+    A failed group is retried by later runs and not notified until then.
+
+    Args:
+        `channel_ids`: Channel IDs
+        `group`: Group
+    """
+    # Raising would exit the service and run the baselines again on restart
+    try:
+        baseline_twitch_group(channel_ids, group)
+    except Exception as e:
+        _pending_baselines.add(("twitch", group))
+        send_exception_log(
+            f"[baseline] Twitch group {group} failed, retry next run"
+            f"\n{type(e).__name__}: {e}"
+        )
+
+
 def get_multiple_twitch_title_and_url(channel_ids, group):
     """Get Multiple Live Title, URL, and Channel Title from Select Channels
 
@@ -443,6 +576,13 @@ def get_multiple_twitch_title_and_url(channel_ids, group):
     """
     # Helix returns top live streams when user_login is omitted
     if not channel_ids:
+        return []
+
+    key = ("twitch", group)
+    if key in _pending_baselines:
+        baseline_twitch_group(channel_ids, group)
+        _pending_baselines.discard(key)
+        log("[baseline]", f"Retry succeeded: {key}")
         return []
 
     stream_infos = TwitchHandler().get_stream_infos(channel_ids)

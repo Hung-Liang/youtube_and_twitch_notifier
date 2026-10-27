@@ -10,6 +10,8 @@ from libs.utils.tools import (
     get_multiple_live_title_and_url,
     get_multiple_twitch_title_and_url,
     get_multiple_upload_id,
+    init_twitch_baseline,
+    init_youtube_baseline,
     send_exception_log,
 )
 
@@ -133,3 +135,16 @@ def send_notify(platform, group, config):
     results = get_results(platform, channel_ids, config)
     if results:
         notify_all(results, notifier_types)
+
+
+def init_baseline(platform, group, config):
+    """Ignore what a group shows now, so only later streams are notified."""
+    channel_ids = config['channel_ids']
+
+    if platform == "youtube":
+        notify_member_only = config.get('notify_member_only', False)
+        upload_ids = get_multiple_upload_id(channel_ids, notify_member_only)
+        init_youtube_baseline(upload_ids, group)
+
+    elif platform == "twitch":
+        init_twitch_baseline(channel_ids, group)

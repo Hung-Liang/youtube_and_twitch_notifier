@@ -21,6 +21,7 @@ def isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(logger, "LOG_PATH", log_path)
     monkeypatch.setattr(tools, "LOG_PATH", log_path)
     monkeypatch.setattr(tools, "IGNORE_PATH", ignore_path)
+    monkeypatch.setattr(tools, "_pending_baselines", set())
     monkeypatch.setenv("youtube_api_token", "key1")
 
     def no_network(*args, **kwargs):

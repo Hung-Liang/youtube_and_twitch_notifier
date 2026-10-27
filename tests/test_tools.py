@@ -411,3 +411,163 @@ def test_exception_log_survives_telegram_error(monkeypatch):
     monkeypatch.setattr(tools, "TelegramHandler", BrokenTelegram)
 
     tools.send_exception_log("boom")
+
+
+@pytest.fixture
+def admin_alerts(monkeypatch):
+    sent = []
+    monkeypatch.setattr(tools, "send_exception_log", sent.append)
+    return sent
+
+
+def test_youtube_baseline_ignores_all_but_upcoming(monkeypatch, isolate):
+    patch_youtube(monkeypatch, ["u1", "v1", "v2", "gone"], {
+        "u1": make_video("u1", "upcoming"),
+        "v1": make_video("v1", "live"),
+        "v2": make_video("v2", "none", title="old"),
+    })
+
+    assert tools.baseline_youtube_group({"UC1": "UU1"}, "g") == []
+    assert read_ignore(isolate) == {
+        "v1": "[baseline] title",
+        "v2": "[baseline] old",
+    }
+    assert check_youtube(["live", "none"]) == []
+
+    patch_youtube(monkeypatch, ["u1"], {"u1": make_video("u1", "live")})
+    assert [r[1] for r in check_youtube(["live"])] == [
+        "https://www.youtube.com/watch?v=u1"
+    ]
+
+
+def test_youtube_baseline_merges_into_existing_ignore(monkeypatch, isolate):
+    group_path = isolate / "ignore" / "g"
+    group_path.mkdir()
+    tools.save_json(group_path / "UC1.json", {"old": "title"})
+    patch_youtube(monkeypatch, ["v1"], {"v1": make_video("v1", "none")})
+
+    tools.baseline_youtube_group({"UC1": "UU1"}, "g")
+
+    assert read_ignore(isolate) == {"old": "title", "v1": "[baseline] title"}
+
+
+def test_youtube_baseline_fails_when_video_lookup_fails(
+    monkeypatch, isolate
+):
+    patch_youtube(monkeypatch, ["v1"], {})
+    monkeypatch.setattr(
+        tools.YoutubeHandler, "get_video_info", lambda *a, **k: None
+    )
+
+    assert tools.baseline_youtube_group({"UC1": "UU1"}, "g") == ["UU1"]
+    assert read_ignore(isolate) == {}
+
+
+def test_failed_youtube_baseline_is_retried_before_notifying(
+    monkeypatch, isolate, admin_alerts
+):
+    patch_youtube(monkeypatch, {}, {})
+    monkeypatch.setattr(
+        tools.YoutubeHandler,
+        "find_recent_video",
+        lambda self, playlist_id, **k: (
+            None if playlist_id == "UU1"
+            else [{"contentDetails": {"videoId": "b1"}}]
+        ),
+    )
+
+    tools.init_youtube_baseline({"UC1": "UU1", "UC2": "UU2"}, "g")
+
+    assert tools._pending_baselines == {("youtube", "g", "UU1")}
+    assert len(admin_alerts) == 1
+    assert "UU1" in admin_alerts[0]
+
+    # The retry ignores what is live now instead of notifying it
+    videos = {"a1": make_video("a1", "live"), "b2": make_video("b2", "live")}
+    patch_youtube(monkeypatch, {"UU1": ["a1"], "UU2": ["b2", "b1"]}, videos)
+    results = check_youtube(["live"], {"UC1": "UU1", "UC2": "UU2"})
+
+    assert [r[1] for r in results] == ["https://www.youtube.com/watch?v=b2"]
+    assert tools._pending_baselines == set()
+    assert read_ignore(isolate) == {"a1": "[baseline] title"}
+    assert len(admin_alerts) == 1
+
+    videos["a2"] = make_video("a2", "live")
+    patch_youtube(monkeypatch, {"UU1": ["a2", "a1"]}, videos)
+    assert [r[1] for r in check_youtube(["live"])] == [
+        "https://www.youtube.com/watch?v=a2"
+    ]
+
+
+def test_youtube_baseline_exception_marks_group_pending(
+    monkeypatch, admin_alerts
+):
+    def find_recent_video(*args, **kwargs):
+        raise requests.ConnectionError("down")
+
+    monkeypatch.setattr(
+        tools.YoutubeHandler, "find_recent_video", find_recent_video
+    )
+
+    tools.init_youtube_baseline({"UC1": "UU1", "UC1_member": "UUMO1"}, "g")
+
+    assert tools._pending_baselines == {
+        ("youtube", "g", "UU1"),
+        ("youtube", "g", "UUMO1"),
+    }
+    assert "ConnectionError: down" in admin_alerts[0]
+
+
+def test_youtube_baseline_success_sends_no_alert(monkeypatch, admin_alerts):
+    patch_youtube(monkeypatch, [], {})
+
+    tools.init_youtube_baseline({"UC1": "UU1"}, "g")
+
+    assert tools._pending_baselines == set()
+    assert admin_alerts == []
+
+
+def test_twitch_baseline_ignores_live_streams(monkeypatch, isolate):
+    patch_twitch(monkeypatch, [make_stream("s1")])
+
+    tools.init_twitch_baseline(["chu"], "g")
+
+    assert read_ignore(isolate, "chu") == {"s1": "[baseline] live!"}
+    assert tools.get_multiple_twitch_title_and_url(["chu"], "g") == []
+
+
+def test_twitch_baseline_skips_query_without_channels(monkeypatch):
+    def fail():
+        raise AssertionError("twitch should not be queried")
+
+    monkeypatch.setattr(tools, "TwitchHandler", fail)
+
+    tools.init_twitch_baseline([], "g")
+
+    assert tools._pending_baselines == set()
+
+
+def test_failed_twitch_baseline_is_retried_before_notifying(
+    monkeypatch, isolate, admin_alerts
+):
+    def broken():
+        raise Exception("Twitch API Error: 500")
+
+    monkeypatch.setattr(tools, "TwitchHandler", broken)
+    tools.init_twitch_baseline(["chu"], "g")
+
+    assert tools._pending_baselines == {("twitch", "g")}
+    assert "Twitch API Error: 500" in admin_alerts[0]
+
+    # A failed retry raises to the job error listener and stays pending
+    with pytest.raises(Exception, match="500"):
+        tools.get_multiple_twitch_title_and_url(["chu"], "g")
+    assert tools._pending_baselines == {("twitch", "g")}
+
+    patch_twitch(monkeypatch, [make_stream("s1")])
+    assert tools.get_multiple_twitch_title_and_url(["chu"], "g") == []
+    assert tools._pending_baselines == set()
+    assert read_ignore(isolate, "chu") == {"s1": "[baseline] live!"}
+
+    patch_twitch(monkeypatch, [make_stream("s2")])
+    assert len(tools.get_multiple_twitch_title_and_url(["chu"], "g")) == 1
