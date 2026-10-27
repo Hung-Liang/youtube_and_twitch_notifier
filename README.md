@@ -94,6 +94,14 @@ APP_ENV=""
 - You need to install the requirements by running `pip install -r requirements.txt`.
 - You need to run the `main.py` file.
 
+## Run with Docker
+
+- Put `.env` in the root folder and `config.py` in the `config` folder, then run `scripts/deploy.sh`.
+  - It tags the current image as `chu_yt_notification:prev`, builds a new one, checks the config, and restarts the container.
+- `config/`, `asset/` and `log/` are mounted from the host, so they survive rebuilds.
+- After changing the config, run `docker compose restart notifier`.
+- Rollback: `docker tag chu_yt_notification:prev chu_yt_notification:latest && docker compose up -d`.
+
 ## How to get channel id
 
 - Go to the youtube channel you want to get the id of.

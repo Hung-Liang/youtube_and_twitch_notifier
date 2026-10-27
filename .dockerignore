@@ -1,0 +1,14 @@
+.git
+.env
+config
+asset
+log
+backup
+tests
+scripts
+.venv
+.pytest_cache
+**/__pycache__
+libs/config.py
+libs/dev_config.py
+update_config.ps1

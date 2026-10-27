@@ -98,6 +98,14 @@ APP_ENV=""
 2. 執行 `pip install -r requirements.txt` 安裝相依套件。  
 3. 執行 `main.py` 啟動程式。  
 
+## 使用 Docker 運行
+
+- 把 `.env` 放在專案根目錄、`config.py` 放在 `config` 資料夾，然後執行 `scripts/deploy.sh`。  
+  - 腳本會先把目前的 image 標記為 `chu_yt_notification:prev`，再 build 新 image、檢查 config，最後重啟容器。  
+- `config/`、`asset/`、`log/` 都從主機 mount 進容器，重新 build 也不會遺失。  
+- 修改 config 後執行 `docker compose restart notifier`。  
+- 回滾：`docker tag chu_yt_notification:prev chu_yt_notification:latest && docker compose up -d`。  
+
 ## 如何獲取頻道 ID
 
 ### YouTube 頻道 ID

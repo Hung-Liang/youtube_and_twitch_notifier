@@ -1,0 +1,17 @@
+services:
+  notifier:
+    build: .
+    image: chu_yt_notification:latest
+    env_file: .env
+    volumes:
+      - ./config:/app/config:ro
+      - ./asset:/app/asset
+      - ./log:/app/log
+    restart: unless-stopped
+    # Python as PID 1 ignores SIGTERM without a handler, so stop would hang
+    init: true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
