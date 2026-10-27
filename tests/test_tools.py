@@ -18,25 +18,49 @@ def make_video(video_id, status, title="title", channel="channel"):
 def patch_youtube(monkeypatch, playlist, videos):
     """Fake YoutubeHandler responses.
 
-    `playlist`: video ids returned by playlistItems, newest first.
+    `playlist`: video ids returned by playlistItems, newest first; a dict
+        keyed by playlist id, or a list shared by every playlist.
     `videos`: video info items keyed by id.
+
+    Returns:
+        Calls made, as ("items", playlist_id, max_results) or
+        ("videos", ids, part).
     """
+    calls = []
 
     def find_recent_video(self, playlist_id, part="contentDetails",
                           max_results=3):
+        calls.append(("items", playlist_id, max_results))
+        ids = (
+            playlist.get(playlist_id, [])
+            if isinstance(playlist, dict)
+            else playlist
+        )
         return [
             {"contentDetails": {"videoId": video_id}}
-            for video_id in playlist[:max_results]
+            for video_id in ids[:max_results]
         ]
 
     def get_video_info(self, video_id, part="snippet"):
         ids = video_id.split(",")
+        calls.append(("videos", ids, part))
         return {"items": [videos[i] for i in ids if i in videos]}
 
     monkeypatch.setattr(
         tools.YoutubeHandler, "find_recent_video", find_recent_video
     )
     monkeypatch.setattr(tools.YoutubeHandler, "get_video_info", get_video_info)
+    return calls
+
+
+def check_youtube(broadcast_types, upload_ids=None):
+    return tools.get_multiple_live_title_and_url(
+        upload_ids or {"UC1": "UU1"}, broadcast_types, "g"
+    )
+
+
+def read_ignore(isolate, channel_id="UC1"):
+    return tools.load_json(isolate / "ignore" / "g" / f"{channel_id}.json")
 
 
 def test_get_message_telegram_escapes_html():
@@ -80,141 +104,147 @@ def test_load_ignore_json_keeps_all_at_200(tmp_path):
     assert len(tools.load_ignore_json(path)) == 200
 
 
-def test_live_video_is_returned_once(monkeypatch):
-    patch_youtube(
-        monkeypatch,
-        ["v1", "v2"],
-        {"v1": make_video("v1", "live"), "v2": make_video("v2", "none")},
-    )
+def test_live_video_is_returned_until_marked(monkeypatch):
+    patch_youtube(monkeypatch, ["v1"], {"v1": make_video("v1", "live")})
 
-    first = tools.get_live_title_and_url("UU1", "g", ["live"])
+    first = check_youtube(["live"])
     assert [r[:3] for r in first] == [
         ("title", "https://www.youtube.com/watch?v=v1", "channel")
     ]
 
     # Not marked yet, so it is returned again
-    assert len(tools.get_live_title_and_url("UU1", "g", ["live"])) == 1
+    assert len(check_youtube(["live"])) == 1
 
     first[0][3]()
-    assert tools.get_live_title_and_url("UU1", "g", ["live"]) == []
+    assert check_youtube(["live"]) == []
 
 
-def test_all_upcoming_fetches_more_videos(monkeypatch):
-    playlist = ["u1", "u2", "u3", "v4"]
-    videos = {i: make_video(i, "upcoming") for i in ["u1", "u2", "u3"]}
-    videos["v4"] = make_video("v4", "none")
-    patch_youtube(monkeypatch, playlist, videos)
-
-    results = tools.get_live_title_and_url("UU1", "g", ["none"])
-
-    assert [r[1] for r in results] == [
-        "https://www.youtube.com/watch?v=v4"
-    ]
-
-
-def test_all_upcoming_fetch_stops_at_api_limit(monkeypatch):
-    playlist = [f"u{i}" for i in range(60)]
-    patch_youtube(
-        monkeypatch, playlist, {i: make_video(i, "upcoming") for i in playlist}
-    )
-    requested = []
-    fake_find = tools.YoutubeHandler.find_recent_video
-
-    def find_recent_video(self, playlist_id, part="contentDetails",
-                          max_results=3):
-        requested.append(max_results)
-        return fake_find(self, playlist_id, part, max_results)
-
-    monkeypatch.setattr(
-        tools.YoutubeHandler, "find_recent_video", find_recent_video
+def test_unwanted_video_is_ignored_with_skip_mark(monkeypatch, isolate):
+    calls = patch_youtube(
+        monkeypatch,
+        ["v1", "v2"],
+        {"v1": make_video("v1", "live"), "v2": make_video("v2", "none")},
     )
 
-    assert tools.get_live_title_and_url("UU1", "g", ["live"]) == []
-    assert max(requested) == tools.YOUTUBE_MAX_RESULTS
+    results = check_youtube(["none"])
+
+    assert [r[1] for r in results] == ["https://www.youtube.com/watch?v=v2"]
+    assert read_ignore(isolate) == {"v1": "[skip] title"}
+
+    calls.clear()
+    check_youtube(["none"])
+    assert ("videos", ["v2"], tools.YOUTUBE_VIDEO_PARTS) in calls
 
 
-def test_upcoming_pushed_out_of_playlist_is_notified_when_live(
-    monkeypatch, isolate
-):
+def test_upcoming_is_not_ignored_until_live(monkeypatch, isolate):
     patch_youtube(monkeypatch, ["u1"], {"u1": make_video("u1", "upcoming")})
-    assert tools.get_live_title_and_url("UU1", "g", ["live"]) == []
-    assert tools.load_json(isolate / "upcoming" / "g" / "UU1.json") == {
-        "u1": "title"
-    }
 
-    # Newer uploads push u1 out of the recent items before it goes live
-    videos = {i: make_video(i, "none") for i in ["v1", "v2", "v3"]}
-    videos["u1"] = make_video("u1", "live")
-    patch_youtube(monkeypatch, ["v1", "v2", "v3", "u1"], videos)
+    assert check_youtube(["live"]) == []
+    assert read_ignore(isolate) == {}
+    log_text = "".join(
+        p.read_text(encoding="utf-8") for p in (isolate / "log").iterdir()
+    )
+    assert "[upcoming] g / UC1 / u1 / title" in log_text
 
-    results = tools.get_live_title_and_url("UU1", "g", ["live"])
-    assert [r[1] for r in results] == [
+    patch_youtube(monkeypatch, ["u1"], {"u1": make_video("u1", "live")})
+    assert [r[1] for r in check_youtube(["live"])] == [
         "https://www.youtube.com/watch?v=u1"
     ]
 
-    # Still tracked until delivered, then dropped on the next run
-    results[0][3]()
-    assert tools.get_live_title_and_url("UU1", "g", ["live"]) == []
-    assert tools.load_json(isolate / "upcoming" / "g" / "UU1.json") == {}
+
+def test_playlist_items_use_check_range(monkeypatch):
+    calls = patch_youtube(monkeypatch, [], {})
+
+    check_youtube(["live"])
+
+    assert calls == [("items", "UU1", tools.YOUTUBE_CHECK_RANGE)]
+    assert tools.YOUTUBE_CHECK_RANGE == 50
 
 
-def test_tracked_upcoming_member_only_keeps_prefix(monkeypatch):
-    patch_youtube(monkeypatch, ["u1"], {"u1": make_video("u1", "upcoming")})
-    tools.get_live_title_and_url(
-        "UUMO1", "g", ["live"], is_member_only=True, channel_id="UC1"
-    )
-
-    patch_youtube(
+def test_group_videos_are_looked_up_together(monkeypatch):
+    calls = patch_youtube(
         monkeypatch,
-        ["v1", "v2", "v3"],
+        {"UU1": ["a1", "a2"], "UU2": ["b1"]},
+        {i: make_video(i, "live") for i in ["a1", "a2", "b1"]},
+    )
+
+    results = check_youtube(["live"], {"UC1": "UU1", "UC2": "UU2"})
+
+    assert len(results) == 3
+    assert [c for c in calls if c[0] == "videos"] == [
+        ("videos", ["a1", "a2", "b1"], "snippet,liveStreamingDetails")
+    ]
+
+
+def test_group_lookup_is_batched_by_50(monkeypatch):
+    calls = patch_youtube(
+        monkeypatch,
         {
-            **{i: make_video(i, "none") for i in ["v1", "v2", "v3"]},
-            "u1": make_video("u1", "live"),
+            "UU1": [f"a{i}" for i in range(50)],
+            "UU2": [f"b{i}" for i in range(10)],
         },
-    )
-    results = tools.get_live_title_and_url(
-        "UUMO1", "g", ["live"], is_member_only=True, channel_id="UC1"
+        {},
     )
 
-    assert [r[0] for r in results] == ["【Member Only】\ntitle"]
+    check_youtube(["live"], {"UC1": "UU1", "UC2": "UU2"})
 
-
-def test_tracked_upcoming_is_dropped_when_unwanted_or_gone(
-    monkeypatch, isolate
-):
-    upcoming_json = isolate / "upcoming" / "g" / "UU1.json"
-    upcoming_json.parent.mkdir()
-    tools.save_json(upcoming_json, {"ended": "t", "deleted": "t"})
-    patch_youtube(monkeypatch, ["v1"], {
-        "v1": make_video("v1", "none"),
-        "ended": make_video("ended", "none"),
-    })
-
-    assert tools.get_live_title_and_url("UU1", "g", ["live"]) == []
-    assert tools.load_json(upcoming_json) == {}
-
-
-def test_tracked_upcoming_kept_when_video_info_fails(monkeypatch, isolate):
-    upcoming_json = isolate / "upcoming" / "g" / "UU1.json"
-    upcoming_json.parent.mkdir()
-    tools.save_json(upcoming_json, {"u1": "t"})
-    patch_youtube(monkeypatch, [], {})
-    monkeypatch.setattr(
-        tools.YoutubeHandler, "get_video_info", lambda *a, **k: None
-    )
-
-    assert tools.get_live_title_and_url("UU1", "g", ["live"]) == []
-    assert tools.load_json(upcoming_json) == {"u1": "t"}
+    assert [len(c[1]) for c in calls if c[0] == "videos"] == [50, 10]
 
 
 def test_video_in_both_playlists_is_returned_once(monkeypatch):
-    patch_youtube(monkeypatch, ["v1"], {"v1": make_video("v1", "live")})
-
-    results = tools.get_multiple_live_title_and_url(
-        {"UC1": "UU1", "UC1_member": "UUMO1"}, ["live"], "g"
+    calls = patch_youtube(
+        monkeypatch, ["v1"], {"v1": make_video("v1", "live")}
     )
 
+    results = check_youtube(["live"], {"UC1": "UU1", "UC1_member": "UUMO1"})
+
     assert len(results) == 1
+    assert [c[1] for c in calls if c[0] == "videos"] == [["v1"]]
+
+
+def test_member_only_title_and_shared_ignore_file(monkeypatch, isolate):
+    patch_youtube(
+        monkeypatch, {"UUMO1": ["v1"]}, {"v1": make_video("v1", "live")}
+    )
+
+    results = check_youtube(["live"], {"UC1": "UU1", "UC1_member": "UUMO1"})
+    results[0][3]()
+
+    assert results[0][0] == "【Member Only】\ntitle"
+    assert read_ignore(isolate) == {"v1": "【Member Only】\ntitle"}
+
+
+def test_video_without_info_is_retried(monkeypatch, isolate):
+    calls = patch_youtube(monkeypatch, ["v1"], {})
+
+    assert check_youtube(["live"]) == []
+    assert read_ignore(isolate) == {}
+
+    calls.clear()
+    check_youtube(["live"])
+    assert [c[1] for c in calls if c[0] == "videos"] == [["v1"]]
+
+
+def test_no_videos_returns_empty(monkeypatch):
+    monkeypatch.setattr(
+        tools.YoutubeHandler, "find_recent_video", lambda *a, **k: None
+    )
+
+    assert check_youtube(["live"]) == []
+
+
+def test_ignored_video_info_is_not_fetched(monkeypatch, isolate):
+    patch_youtube(monkeypatch, ["v1"], {"v1": make_video("v1", "live")})
+    group_path = isolate / "ignore" / "g"
+    group_path.mkdir()
+    tools.save_json(group_path / "UC1.json", {"v1": "title"})
+
+    def get_video_info(self, video_id, part="snippet"):
+        raise AssertionError("ignored video should not be fetched")
+
+    monkeypatch.setattr(tools.YoutubeHandler, "get_video_info", get_video_info)
+
+    assert check_youtube(["live"]) == []
 
 
 def test_exception_message_escapes_html():
@@ -260,59 +290,6 @@ def test_load_ignore_json_creates_missing_file(tmp_path):
 
     assert tools.load_ignore_json(path) == {}
     assert tools.load_json(path) == {}
-
-
-def test_broadcast_types_filter_videos(monkeypatch):
-    patch_youtube(
-        monkeypatch,
-        ["v1", "v2"],
-        {"v1": make_video("v1", "live"), "v2": make_video("v2", "none")},
-    )
-
-    results = tools.get_live_title_and_url("UU1", "g", ["none"])
-
-    assert [r[1] for r in results] == ["https://www.youtube.com/watch?v=v2"]
-
-
-def test_member_only_title_and_shared_ignore_file(monkeypatch, isolate):
-    patch_youtube(monkeypatch, ["v1"], {"v1": make_video("v1", "live")})
-
-    results = tools.get_live_title_and_url(
-        "UUMO1", "g", ["live"], is_member_only=True, channel_id="UC1"
-    )
-    results[0][3]()
-
-    assert results[0][0] == "【Member Only】\ntitle"
-    ignore = tools.load_json(isolate / "ignore" / "g" / "UC1.json")
-    assert ignore == {"v1": "【Member Only】\ntitle"}
-
-
-def test_video_without_info_is_skipped(monkeypatch):
-    patch_youtube(monkeypatch, ["v1"], {})
-
-    assert tools.get_live_title_and_url("UU1", "g", ["live"]) == []
-
-
-def test_no_videos_returns_empty(monkeypatch):
-    monkeypatch.setattr(
-        tools.YoutubeHandler, "find_recent_video", lambda *a, **k: None
-    )
-
-    assert tools.get_live_title_and_url("UU1", "g", ["live"]) == []
-
-
-def test_ignored_video_info_is_not_fetched(monkeypatch, isolate):
-    patch_youtube(monkeypatch, ["v1"], {"v1": make_video("v1", "live")})
-    group_path = isolate / "ignore" / "g"
-    group_path.mkdir()
-    tools.save_json(group_path / "UU1.json", {"v1": "title"})
-
-    def get_video_info(self, video_id, part="snippet"):
-        raise AssertionError("ignored video should not be fetched")
-
-    monkeypatch.setattr(tools.YoutubeHandler, "get_video_info", get_video_info)
-
-    assert tools.get_live_title_and_url("UU1", "g", ["live"]) == []
 
 
 def test_get_upload_id_derives_from_channel_id():

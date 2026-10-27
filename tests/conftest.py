@@ -16,14 +16,11 @@ def isolate(tmp_path, monkeypatch):
     ignore_path = tmp_path / "ignore"
     log_path.mkdir()
     ignore_path.mkdir()
-    upcoming_path = tmp_path / "upcoming"
-    upcoming_path.mkdir()
 
     # Daily logs are uploaded to Telegram, so tests must not write to them
     monkeypatch.setattr(logger, "LOG_PATH", log_path)
     monkeypatch.setattr(tools, "LOG_PATH", log_path)
     monkeypatch.setattr(tools, "IGNORE_PATH", ignore_path)
-    monkeypatch.setattr(tools, "UPCOMING_PATH", upcoming_path)
     monkeypatch.setenv("youtube_api_token", "key1")
 
     def no_network(*args, **kwargs):

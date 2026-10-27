@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from libs.handler.telegram_handler import TelegramHandler
 from libs.handler.twitch_handler import TwitchHandler
 from libs.handler.youtube_handler import YoutubeHandler
-from libs.utils.file_path import IGNORE_PATH, LOG_PATH, UPCOMING_PATH
+from libs.utils.file_path import IGNORE_PATH, LOG_PATH
 from libs.utils.logger import get_log_filename, log
 
 load_dotenv()
@@ -21,6 +21,11 @@ TELEGRAM_MESSAGE_LIMIT = 4096
 
 # Max maxResults for playlistItems and max IDs per videos request
 YOUTUBE_MAX_RESULTS = 50
+
+# playlistItems costs 1 unit for up to 50 items, so check them all
+YOUTUBE_CHECK_RANGE = YOUTUBE_MAX_RESULTS
+
+YOUTUBE_VIDEO_PARTS = "snippet,liveStreamingDetails"
 
 # Upload and member-only playlists share one ignore file, and entries are
 # trimmed in write order, so keep a buffer over the 2 x 50 checked videos
@@ -226,37 +231,105 @@ def get_multiple_live_title_and_url(upload_ids, broadcast_types, group):
         `group`: Group
 
     Returns:
-        A Multiple Live Title, URL, and Channel Title from Select Channels
+        list: (Live Title, URL, Channel Title, Mark Notified) per video;
+            call Mark Notified after sending to skip it next time.
     """
+    playlists, video_info_cache, _ = fetch_playlists(upload_ids, group)
+
     results = []
     seen_urls = set()
+
+    for playlist in playlists:
+        playlist_results = get_playlist_results(
+            playlist, video_info_cache, broadcast_types, group
+        )
+
+        # Ignore files are only updated after sending, so a video found in
+        # both the upload and member-only playlists must be deduped here
+        for result in playlist_results:
+            if result[1] not in seen_urls:
+                seen_urls.add(result[1])
+                results.append(result)
+
+    return results
+
+
+def get_ignore_json(group, channel_id):
+    """Get the ignore json path of a channel, shared by its playlists.
+
+    Args:
+        `group`: Group
+        `channel_id`: Channel ID
+
+    Returns:
+        Ignore Json Path
+    """
+    group_path = Path(IGNORE_PATH, group)
+    group_path.mkdir(parents=True, exist_ok=True)
+    return Path(group_path, f"{channel_id}.json")
+
+
+def fetch_playlists(upload_ids, group):
+    """Fetch recent videos of each playlist, then look up the ones not
+    ignored yet in shared batches.
+
+    Args:
+        `upload_ids`: Upload Playlist IDs keyed by channel key
+        `group`: Group
+
+    Returns:
+        (playlists, video_info_cache, gone_ids); `video_ids` of a playlist
+        holds its videos not ignored yet, or None if the playlist request
+        failed.
+    """
+    playlists = []
 
     for channel_key, upload_id in upload_ids.items():
         # Check if this is a member-only playlist
         is_member_only = channel_key.endswith("_member")
 
         # Extract the original channel_id (remove _member suffix if present)
-        original_channel_id = (
-            channel_key[:-7] if is_member_only else channel_key
+        channel_id = channel_key[:-7] if is_member_only else channel_key
+
+        ignore_json = get_ignore_json(group, channel_id)
+        ignore_list = load_ignore_json(ignore_json)
+
+        videos = YoutubeHandler().find_recent_video(
+            upload_id, max_results=YOUTUBE_CHECK_RANGE
+        )
+        if not videos:
+            log("[main]", f"No videos found for upload_id: {upload_id}")
+
+        video_ids = None
+        if videos is not None:
+            video_ids = [
+                video["contentDetails"]["videoId"]
+                for video in videos
+                if video["contentDetails"]["videoId"] not in ignore_list
+            ]
+
+        playlists.append(
+            {
+                "upload_id": upload_id,
+                "channel_id": channel_id,
+                "is_member_only": is_member_only,
+                "ignore_json": ignore_json,
+                "video_ids": video_ids,
+            }
         )
 
-        live_title_and_url = get_live_title_and_url(
-            upload_id,
-            group,
-            broadcast_types,
-            3,
-            is_member_only,
-            original_channel_id,
+    # A video can be in both the upload and member-only playlists
+    video_ids = list(
+        dict.fromkeys(
+            video_id
+            for playlist in playlists
+            for video_id in playlist["video_ids"] or []
         )
+    )
+    video_info_cache = {}
+    gone_ids = fetch_video_info(video_ids, video_info_cache)
 
-        # Ignore files are only updated after sending, so a video found in
-        # both the upload and member-only playlists must be deduped here
-        for result in live_title_and_url:
-            if result[1] not in seen_urls:
-                seen_urls.add(result[1])
-                results.append(result)
-
-    return results
+    return playlists, video_info_cache, gone_ids
 
 
 def fetch_video_info(video_ids, video_info_cache):
@@ -273,7 +346,9 @@ def fetch_video_info(video_ids, video_info_cache):
 
     for start in range(0, len(video_ids), YOUTUBE_MAX_RESULTS):
         chunk = video_ids[start:start + YOUTUBE_MAX_RESULTS]
-        video_info = YoutubeHandler().get_video_info(",".join(chunk))
+        video_info = YoutubeHandler().get_video_info(
+            ",".join(chunk), part=YOUTUBE_VIDEO_PARTS
+        )
         # A failed request says nothing about whether the videos still exist
         if video_info is None:
             continue
@@ -287,115 +362,27 @@ def fetch_video_info(video_ids, video_info_cache):
     return gone_ids
 
 
-def get_live_title_and_url(
-    upload_id,
-    group,
-    broadcast_types=["none", "live"],
-    max_results=3,
-    is_member_only=False,
-    channel_id=None,
-):
-    """Get Live Title, URL, and Channel Title from the selected channel.
+def get_playlist_results(playlist, video_info_cache, broadcast_types, group):
+    """Sort the new videos of one playlist by broadcast status.
 
-    Upcoming videos are remembered and polled by ID until they go live,
-    since newer uploads can push them out of the recent playlist items.
+    Upcoming videos are left out of the ignore json, so they are checked
+    again until they go live or leave the checked range. Unwanted videos
+    are ignored right away so they are not looked up again.
 
     Args:
-        upload_id (str): Upload Playlist ID of the selected channel.
-        group (str): Group name.
-        broadcast_types (list): Broadcast types to check.
-        max_results (int): Maximum results to fetch.
-        is_member_only (bool): Whether this is a member-only playlist.
-        channel_id (str): Original channel ID for shared ignore tracking.
+        `playlist`: A playlist from `fetch_playlists`
+        `video_info_cache`: Video info keyed by ID
+        `broadcast_types`: Broadcast Types
+        `group`: Group
 
     Returns:
-        list: (Live Title, URL, Channel Title, Mark Notified) per video;
-            call Mark Notified after sending to skip it next time.
+        list: (Live Title, URL, Channel Title, Mark Notified) per video
     """
-    group_path = Path(IGNORE_PATH, group)
-    group_path.mkdir(parents=True, exist_ok=True)
-
-    if channel_id:
-        ignore_json = Path(group_path, f"{channel_id}.json")
-    else:
-        ignore_json = Path(group_path, f"{upload_id}.json")
-
-    ignore_list = load_ignore_json(ignore_json)
-
-    upcoming_path = Path(UPCOMING_PATH, group)
-    upcoming_path.mkdir(parents=True, exist_ok=True)
-    # Keyed by playlist so a member-only stream keeps its title prefix
-    upcoming_json = Path(upcoming_path, f"{upload_id}.json")
-    create_empty_json(upcoming_json)
-    tracked = load_json(upcoming_json)
-
-    video_info_cache = {}
-    video_ids = []
-
-    while True:
-        videos = YoutubeHandler().find_recent_video(
-            upload_id, max_results=max_results
-        )
-        if not videos:
-            log("[main]", f"No videos found for upload_id: {upload_id}")
-            break
-        video_ids = [video["contentDetails"]["videoId"] for video in videos]
-
-        fetch_video_info(
-            [
-                video_id
-                for video_id in video_ids
-                if video_id not in ignore_list
-                and video_id not in video_info_cache
-            ],
-            video_info_cache,
-        )
-
-        upcoming = sum(
-            1
-            for video_id in video_ids
-            if video_id not in ignore_list
-            and video_id in video_info_cache
-            and video_info_cache[video_id]["snippet"].get(
-                "liveBroadcastContent"
-            ) == "upcoming"
-        )
-
-        # Older videos were already seen by earlier runs, but a batch of
-        # newly scheduled streams may hide ones that were never seen
-        if upcoming < max_results or max_results >= YOUTUBE_MAX_RESULTS:
-            break
-
-        log("[main]", "All videos are upcoming")
-        max_results = min(max_results + 3, YOUTUBE_MAX_RESULTS)
-
-    tracked_ids = [
-        video_id
-        for video_id in tracked
-        if video_id not in video_ids and video_id not in ignore_list
-    ]
-    gone_ids = fetch_video_info(
-        [
-            video_id
-            for video_id in tracked_ids
-            if video_id not in video_info_cache
-        ],
-        video_info_cache,
-    )
-
-    # Notified videos are dropped here, on the run after they were sent
-    new_tracked = {
-        video_id: title
-        for video_id, title in tracked.items()
-        if video_id not in ignore_list and video_id not in gone_ids
-    }
-
     results = []
+    skipped = {}
 
-    for video_id in video_ids + tracked_ids:
-        if video_id in ignore_list:
-            continue
-
+    for video_id in playlist["video_ids"] or []:
+        # Private or scheduled videos may become public later
         if video_id not in video_info_cache:
             log("[main]", f"No video info found for video_id: {video_id}")
             continue
@@ -408,34 +395,38 @@ def get_live_title_and_url(
         )
 
         if broadcast_status == "upcoming":
-            new_tracked[video_id] = snippet["title"]
+            log(
+                "[upcoming]",
+                f"{group} / {playlist['channel_id']} / {video_id}"
+                f" / {snippet['title']}",
+            )
             continue
 
-        # Wanted videos stay tracked until notified, so a failed delivery is
-        # retried even after they leave the recent playlist items
         if broadcast_status not in broadcast_types:
-            new_tracked.pop(video_id, None)
+            skipped[video_id] = "[skip] " + snippet["title"]
+            continue
 
-        if broadcast_status in broadcast_types:
-            live_title = snippet["title"]
+        live_title = snippet["title"]
 
-            if is_member_only:
-                live_title = "【Member Only】\n" + live_title
+        if playlist["is_member_only"]:
+            live_title = "【Member Only】\n" + live_title
 
-            channel_title = snippet["channelTitle"]
-            url = f"https://www.youtube.com/watch?v={video_id}"
+        channel_title = snippet["channelTitle"]
+        url = f"https://www.youtube.com/watch?v={video_id}"
 
-            results.append(
-                (
-                    live_title,
-                    url,
-                    channel_title,
-                    make_mark_notified(ignore_json, video_id, live_title),
-                )
+        results.append(
+            (
+                live_title,
+                url,
+                channel_title,
+                make_mark_notified(
+                    playlist["ignore_json"], video_id, live_title
+                ),
             )
+        )
 
-    if new_tracked != tracked:
-        save_json(upcoming_json, new_tracked)
+    if skipped:
+        add_ignore_entries(playlist["ignore_json"], skipped)
 
     return results
 
@@ -517,6 +508,18 @@ def update_ignore_json(json_path, ignore_list, key, value):
         `value`: Value
     """
     ignore_list[key] = value
+    save_json(json_path, ignore_list)
+
+
+def add_ignore_entries(json_path, entries):
+    """Merge entries into the ignore json.
+
+    Args:
+        `json_path`: Ignore Json Path
+        `entries`: Titles keyed by Video ID or Stream ID
+    """
+    ignore_list = load_ignore_json(json_path)
+    ignore_list.update(entries)
     save_json(json_path, ignore_list)
 
 
