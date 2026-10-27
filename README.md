@@ -105,10 +105,10 @@ twitch_client_secret=""
 
 ## Running tests
 
-- Tests run in a local [uv](https://docs.astral.sh/uv/) virtual environment on Python 3.10, the same version as the server.
+- Tests run in a local [uv](https://docs.astral.sh/uv/) virtual environment on Python 3.12, the same version as the Docker image.
 
 ```bash
-uv venv --python 3.10
+uv venv --python 3.12
 uv pip install -r requirements-dev.txt
 uv run pytest
 ```

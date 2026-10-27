@@ -108,10 +108,10 @@ twitch_client_secret=""
 
 ## 執行測試
 
-- 測試使用本機的 [uv](https://docs.astral.sh/uv/) 虛擬環境，Python 版本為 3.10，與伺服器相同。
+- 測試使用本機的 [uv](https://docs.astral.sh/uv/) 虛擬環境，Python 版本為 3.12，與 Docker image 相同。
 
 ```bash
-uv venv --python 3.10
+uv venv --python 3.12
 uv pip install -r requirements-dev.txt
 uv run pytest
 ```
