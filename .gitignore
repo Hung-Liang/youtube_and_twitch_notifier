@@ -6,6 +6,8 @@ test.*
 libs/config.py
 backup/
 libs/dev_config.py
+config/*
+!config/config.example.py
 update_config.ps1
 todo.md
 .venv/

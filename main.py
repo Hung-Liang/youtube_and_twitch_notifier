@@ -1,8 +1,11 @@
+import argparse
+import sys
+
 from apscheduler.events import EVENT_JOB_ERROR
 from apscheduler.schedulers.blocking import BlockingScheduler
 
-from libs.config import youtube_groups, twitch_groups
 from libs.utils.config_check import check_groups
+from libs.utils.config_loader import load_config
 from libs.utils.logger import TIMEZONE, log
 from libs.utils.notify import send_notify
 from libs.utils.tools import (
@@ -32,7 +35,7 @@ def on_job_error(event):
     )
 
 
-def check_config():
+def check_config(youtube_groups, twitch_groups):
     errors = []
     for platform, groups in (
         ("youtube", youtube_groups),
@@ -47,8 +50,26 @@ def check_config():
         raise ValueError("Invalid config.py:\n" + "\n".join(errors))
 
 
-def main():
-    check_config()
+def main(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--check-config",
+        action="store_true",
+        help="validate the config file and exit",
+    )
+    args = parser.parse_args(argv)
+
+    if args.check_config:
+        try:
+            check_config(*load_config())
+        except (FileNotFoundError, ValueError) as e:
+            print(e)
+            return 1
+        print("Config OK")
+        return 0
+
+    youtube_groups, twitch_groups = load_config()
+    check_config(youtube_groups, twitch_groups)
 
     send_service_start_notification()
 
@@ -64,4 +85,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

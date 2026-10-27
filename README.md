@@ -9,8 +9,9 @@
 
 ## How to use
 
-- First you need to create a file called `config.py` in the `libs` folder.
-- In the `config.py` file you need to add the following code:
+- First you need to create a file called `config.py` in the `config` folder (copy `config/config.example.py`).
+- For local testing, create `config/dev_config.py` with the same format and set `APP_ENV="dev"` in `.env`.
+- In the config file you need to add the following code:
 
 ```python
 youtube_groups = {
@@ -61,7 +62,8 @@ twitch_groups = {
   - if the word_list is empty, the top of the message will be stream channel name.
 - `interval` is the time in minutes between each check.
   - Use a value that divides 60 (e.g. 1, 2, 3, 5, 10), otherwise polling gaps will be uneven.
-- `config.py` is checked at startup: missing or invalid settings stop the service, and an uneven `interval` or empty `broadcast_types` only logs a warning.
+- Run `python main.py --check-config` to validate the config without starting the service.
+- The config is checked at startup: missing or invalid settings stop the service, and an uneven `interval` or empty `broadcast_types` only logs a warning.
 
 ## Env file
 
@@ -76,12 +78,15 @@ youtube_api_token=""
 
 twitch_client_id=""
 twitch_client_secret=""
+
+APP_ENV=""
 ```
 
 - `telegram_admin_id` is your telegram id.
 - `bot_token` is the token of your telegram bot.
 - `youtube_api_token` is the token of your youtube api.
 - `twitch_client_id` and `twitch_client_secret` are the client id and client secret of your twitch api.
+- `APP_ENV` set to `dev` loads `config/dev_config.py`, any other value loads `config/config.py`.
 
 ## How to run
 

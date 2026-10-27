@@ -9,8 +9,9 @@
 
 ## 如何使用
 
-1. 在 `libs` 資料夾中建立 `config.py` 檔案。  
-2. 在 `config.py` 檔案中加入以下程式碼：  
+1. 在 `config` 資料夾中建立 `config.py` 檔案（可複製 `config/config.example.py`）。  
+2. 本地測試時，用相同格式建立 `config/dev_config.py`，並在 `.env` 設定 `APP_ENV="dev"`。  
+3. 在 config 檔案中加入以下程式碼：  
 
 ```python
 youtube_groups = {
@@ -63,7 +64,8 @@ twitch_groups = {
   - 若 `word_list` 為空，則開頭將顯示直播頻道名稱。  
 - `interval` 指每次檢查的間隔時間（以分鐘計算）。  
   - 建議設定能整除 60 的數值（如 1、2、3、5、10），否則檢查間隔會不平均。  
-- 啟動時會檢查 `config.py`：缺少或錯誤的設定會讓服務無法啟動；`interval` 無法整除 60 或 `broadcast_types` 為空只會記錄警告。  
+- 執行 `python main.py --check-config` 可只檢查 config，不啟動服務。  
+- 啟動時會檢查 config：缺少或錯誤的設定會讓服務無法啟動；`interval` 無法整除 60 或 `broadcast_types` 為空只會記錄警告。  
 
 ## 設定 `.env` 檔案
 
@@ -78,6 +80,8 @@ youtube_api_token=""
 
 twitch_client_id=""
 twitch_client_secret=""
+
+APP_ENV=""
 ```
 
 ### 參數說明
@@ -86,6 +90,7 @@ twitch_client_secret=""
 - `bot_token`：您的 Telegram 機器人 Token。  
 - `youtube_api_token`：您的 YouTube API Token。  
 - `twitch_client_id` 和 `twitch_client_secret`：Twitch API 的 Client ID 和 Client Secret。  
+- `APP_ENV`：設為 `dev` 時讀取 `config/dev_config.py`，其他值則讀取 `config/config.py`。  
 
 ## 如何運行
 

@@ -1,6 +1,7 @@
 import pytest
 
 import main
+from libs.utils import config_loader
 
 
 class FakeScheduler:
@@ -23,24 +24,18 @@ def test_group_jobs_use_whole_minute_cron():
     assert kwargs == {"minute": "0-59/5", "args": ["twitch", "g", config]}
 
 
-def test_check_config_raises_on_errors(monkeypatch):
-    monkeypatch.setattr(main, "youtube_groups", {"g": {"interval": 0}})
-    monkeypatch.setattr(main, "twitch_groups", {})
-
-    with pytest.raises(ValueError, match="Invalid config.py"):
-        main.check_config()
+def test_check_config_raises_on_errors():
+    with pytest.raises(ValueError, match="Invalid config"):
+        main.check_config({"g": {"interval": 0}}, {})
 
 
-def test_check_config_logs_warnings(monkeypatch, capsys):
+def test_check_config_logs_warnings(capsys):
     group = {
         "interval": 7,
         "channel_ids": [],
         "notifier_types": {},
     }
-    monkeypatch.setattr(main, "youtube_groups", {})
-    monkeypatch.setattr(main, "twitch_groups", {"g": group})
-
-    main.check_config()
+    main.check_config({}, {"g": group})
 
     assert "does not divide 60" in capsys.readouterr().out
 
@@ -61,3 +56,33 @@ def test_job_error_sends_exception_text_only(monkeypatch):
         "[scheduler] Job abc failed\nConnectionError: Connection reset"
     ]
     assert 'File "x.py"' in logged[0][1]
+
+
+def test_check_config_flag_exits_without_starting(monkeypatch):
+    def fail(*args, **kwargs):
+        raise AssertionError("must not start the service")
+
+    monkeypatch.setattr(main, "load_config", lambda: ({}, {}))
+    monkeypatch.setattr(main, "send_service_start_notification", fail)
+    monkeypatch.setattr(main, "BlockingScheduler", fail)
+
+    assert main.main(["--check-config"]) == 0
+
+
+def test_check_config_flag_fails_on_invalid_config(monkeypatch, capsys):
+    monkeypatch.setattr(
+        main, "load_config", lambda: ({"g": {"interval": 0}}, {})
+    )
+
+    assert main.main(["--check-config"]) == 1
+    assert "Invalid config" in capsys.readouterr().out
+
+
+def test_check_config_flag_fails_on_missing_config(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        main,
+        "load_config",
+        lambda: config_loader.load_config(tmp_path / "missing.py"),
+    )
+
+    assert main.main(["--check-config"]) == 1

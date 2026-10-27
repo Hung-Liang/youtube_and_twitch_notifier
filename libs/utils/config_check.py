@@ -7,11 +7,11 @@ NOTIFIER_KEYS = {
 
 
 def check_groups(platform, groups):
-    """Check one platform's groups in config.py.
+    """Check one platform's groups in the config file.
 
     Args:
         `platform`: "youtube" or "twitch"
-        `groups`: Groups dict from config.py
+        `groups`: Groups dict from the config file
 
     Returns:
         (errors, warnings): Lists of messages. Errors must stop startup.
