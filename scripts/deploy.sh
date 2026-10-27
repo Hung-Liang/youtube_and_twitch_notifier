@@ -18,7 +18,7 @@ else
 fi
 
 echo "==> Preparing asset/ and log/"
-mkdir -p asset log
+scripts/prepare_dirs.sh
 
 if docker image inspect chu_yt_notification:latest >/dev/null 2>&1; then
   echo "==> Tagging current image as :prev"
