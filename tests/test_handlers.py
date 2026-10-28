@@ -213,6 +213,23 @@ def test_telegram_send_document_returns_body(monkeypatch, tmp_path):
     assert body == {"ok": True}
 
 
+def test_telegram_send_document_network_error_fails(monkeypatch, tmp_path):
+    path = tmp_path / "a.log"
+    path.write_text("x", encoding="utf-8")
+
+    def post(url, files, timeout):
+        raise requests.exceptions.ConnectionError("write operation timed out")
+
+    monkeypatch.setattr(telegram_handler.requests, "post", post)
+
+    sent, body = telegram_handler.TelegramHandler().send_document(
+        "1", path, "a.log"
+    )
+
+    assert sent is False
+    assert body is None
+
+
 @pytest.fixture
 def twitch(monkeypatch):
     """Fake Twitch API; `valid_token` is the token streams accept."""

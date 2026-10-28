@@ -71,7 +71,8 @@ class TelegramHandler:
             `filename`: Filename.
 
         Returns:
-            True if success, False if fail.
+            (True, body) if success, (False, body) if fail, or (False, None)
+            on a network error.
         """
 
         url = 'https://api.telegram.org/bot{}/sendDocument?chat_id={}'.format(
@@ -82,7 +83,17 @@ class TelegramHandler:
             files = {
                 "document": (filename, f, 'application/octet-stream'),
             }
-            res = requests.post(url, files=files, timeout=REQUEST_TIMEOUT)
+            try:
+                res = requests.post(url, files=files, timeout=REQUEST_TIMEOUT)
+            # Network errors are usually transient, so callers treat this as
+            # a failed upload and retry next run instead of failing the job
+            except requests.RequestException as err:
+                # Only the error type: its message may contain the bot token
+                log(
+                    '[telegram_lib]',
+                    f'send document failed: {type(err).__name__}',
+                )
+                return False, None
 
         log(
             '[telegram_lib]',

@@ -101,7 +101,12 @@ def send_service_start_notification():
 
     message = "🚀 <b>Service Started</b>"
 
-    TelegramHandler().send_message(TELEGRAM_ADMIN_ID, message)
+    # A flaky network at startup must not stop the service from running
+    try:
+        TelegramHandler().send_message(TELEGRAM_ADMIN_ID, message)
+    except requests.RequestException as err:
+        # Only the error type: its message may contain the bot token
+        log("[main]", f"Send start notification failed: {type(err).__name__}")
 
 
 def send_daily_log():

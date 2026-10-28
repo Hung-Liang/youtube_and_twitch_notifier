@@ -436,6 +436,16 @@ def test_exception_log_survives_telegram_error(monkeypatch):
     tools.send_exception_log("boom")
 
 
+def test_start_notification_survives_telegram_error(monkeypatch):
+    class BrokenTelegram:
+        def send_message(self, cid, message):
+            raise requests.ConnectionError()
+
+    monkeypatch.setattr(tools, "TelegramHandler", BrokenTelegram)
+
+    tools.send_service_start_notification()
+
+
 @pytest.fixture
 def admin_alerts(monkeypatch):
     sent = []
