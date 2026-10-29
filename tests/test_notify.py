@@ -78,6 +78,19 @@ def test_connection_error_does_not_block_other_recipients(
     assert "secret" not in alerts[0]
 
 
+def test_read_timeout_is_marked_without_resend(monkeypatch, handler, alerts):
+    FakeHandler.replies = {"a": requests.ReadTimeout("bot123:secret")}
+    marked = []
+
+    run_notify(monkeypatch, telegram_config("a"), [make_result(marked)])
+
+    assert [user for user, _ in handler[0].sent] == ["a"]
+    assert marked == [True]
+    assert len(alerts) == 1
+    assert "ReadTimeout" in alerts[0]
+    assert "secret" not in alerts[0]
+
+
 def test_not_marked_when_every_recipient_fails(monkeypatch, handler, alerts):
     FakeHandler.replies = {"a": 500, "b": requests.Timeout()}
     marked = []

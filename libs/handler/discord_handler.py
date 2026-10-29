@@ -5,7 +5,7 @@ from libs.utils.logger import log
 
 load_dotenv()
 
-REQUEST_TIMEOUT = 10
+REQUEST_TIMEOUT = 30
 
 
 class DiscordHandler:
