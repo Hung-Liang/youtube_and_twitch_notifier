@@ -413,17 +413,23 @@ def test_daily_log_uploads_past_logs_only(monkeypatch, isolate):
     assert [p.name for p in log_path.iterdir()] == [today]
 
 
-def test_daily_log_keeps_file_when_upload_fails(monkeypatch, isolate):
+def test_daily_log_deletes_file_and_alerts_when_upload_fails(
+    monkeypatch, isolate
+):
     log_path = isolate / "log"
     (log_path / "2026-01-01.log").write_text("x", encoding="utf-8")
 
     FakeTelegramDocument.sent = []
     FakeTelegramDocument.succeed = False
     monkeypatch.setattr(tools, "TelegramHandler", FakeTelegramDocument)
+    alerts = []
+    monkeypatch.setattr(tools, "send_exception_log", alerts.append)
 
     tools.send_daily_log()
 
-    assert (log_path / "2026-01-01.log").exists()
+    assert not (log_path / "2026-01-01.log").exists()
+    assert len(alerts) == 1
+    assert "2026-01-01.log" in alerts[0]
 
 
 def test_exception_log_survives_telegram_error(monkeypatch):

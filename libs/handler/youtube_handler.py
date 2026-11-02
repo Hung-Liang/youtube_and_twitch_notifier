@@ -48,6 +48,12 @@ def is_playlist_not_found(res):
     return any(error.get("reason") == "playlistNotFound" for error in errors)
 
 
+def log_response(action, res):
+    # Success bodies hold full video descriptions, which bloat the log
+    detail = "" if res.status_code == 200 else f" {res.text[:500]}"
+    log('[youtube_lib]', f'{action}: {res.status_code}{detail}')
+
+
 class YoutubeHandler:
     """Youtube Handler
 
@@ -163,10 +169,7 @@ class YoutubeHandler:
         if res is None:
             return None
 
-        log(
-            '[youtube_lib]',
-            f'find recent video: {res.status_code} {res.text}',
-        )
+        log_response('find recent video', res)
 
         if res.status_code == 200:
             return json.loads(res.text)["items"]
@@ -196,10 +199,7 @@ class YoutubeHandler:
         if res is None:
             return None
 
-        log(
-            '[youtube_lib]',
-            f'get video info: {res.status_code} {res.text}',
-        )
+        log_response('get video info', res)
 
         if res.status_code == 200:
             return json.loads(res.text)

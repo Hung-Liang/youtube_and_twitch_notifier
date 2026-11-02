@@ -125,9 +125,13 @@ def send_daily_log():
             TELEGRAM_ADMIN_ID, log_path, "[Daily Log] " + filename
         )
 
-        # Keep the file so it will be retried on the next run
-        if sent:
-            log_path.unlink()
+        # Delete even when unsent, or failed uploads pile up and fill the disk
+        log_path.unlink()
+
+        if not sent:
+            send_exception_log(
+                f"[main] Daily log upload failed, deleted: {filename}"
+            )
 
 
 def send_exception_log(e):

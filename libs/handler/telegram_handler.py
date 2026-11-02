@@ -71,8 +71,8 @@ class TelegramHandler:
             `filename`: Filename.
 
         Returns:
-            (True, body) if success, (False, body) if fail, or (False, None)
-            on a network error.
+            (True, body) if success, (False, body) if fail. Body is None on a
+            network error or a non-JSON response.
         """
 
         url = 'https://api.telegram.org/bot{}/sendDocument?chat_id={}'.format(
@@ -85,8 +85,7 @@ class TelegramHandler:
             }
             try:
                 res = requests.post(url, files=files, timeout=REQUEST_TIMEOUT)
-            # Network errors are usually transient, so callers treat this as
-            # a failed upload and retry next run instead of failing the job
+            # Callers treat this as a failed upload instead of failing the job
             except requests.RequestException as err:
                 # Only the error type: its message may contain the bot token
                 log(
@@ -100,7 +99,10 @@ class TelegramHandler:
             f'send document: {res.status_code} {res.text}',
         )
 
-        if res.status_code == 200:
-            return True, json.loads(res.text)
-        else:
-            return False, json.loads(res.text)
+        # An oversized upload may be rejected with a non-JSON body
+        try:
+            body = json.loads(res.text)
+        except ValueError:
+            body = None
+
+        return res.status_code == 200, body

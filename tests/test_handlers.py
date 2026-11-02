@@ -198,6 +198,37 @@ def test_youtube_key_is_sent_in_header_not_url(monkeypatch):
     assert "key1" not in url
 
 
+def test_youtube_log_omits_success_body_keeps_error_body(monkeypatch):
+    logged = []
+    monkeypatch.setattr(
+        youtube_handler, "log", lambda *messages: logged.append(messages[1])
+    )
+
+    youtube_handler.log_response("x", FakeResponse(200, {"long": "body"}))
+    youtube_handler.log_response("x", FakeResponse(500, {"e": "a" * 1000}))
+
+    assert logged[0] == "x: 200"
+    assert logged[1].startswith('x: 500 {"e"')
+    assert len(logged[1]) < 600
+
+
+def test_telegram_send_document_non_json_fails(monkeypatch, tmp_path):
+    path = tmp_path / "a.log"
+    path.write_text("x", encoding="utf-8")
+    patch_post(
+        monkeypatch,
+        telegram_handler,
+        FakeResponse(413, ValueError("Request Entity Too Large")),
+    )
+
+    sent, body = telegram_handler.TelegramHandler().send_document(
+        "1", path, "a.log"
+    )
+
+    assert sent is False
+    assert body is None
+
+
 def test_telegram_send_document_returns_body(monkeypatch, tmp_path):
     path = tmp_path / "a.log"
     path.write_text("x", encoding="utf-8")
