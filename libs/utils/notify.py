@@ -17,6 +17,26 @@ from libs.utils.tools import (
 
 # Longest rate-limit wait we accept before giving up on a recipient
 MAX_RETRY_AFTER = 30
+MAX_TRANSIENT_RETRIES = 3
+TRANSIENT_RETRY_DELAY = 5
+
+
+def send_with_transient_retry(handler, user, message):
+    # A connection error or 5xx means the message was not taken, so a resend
+    # cannot duplicate it; ReadTimeout is not a ConnectionError and is not
+    # retried here
+    for attempt in range(MAX_TRANSIENT_RETRIES + 1):
+        last_attempt = attempt == MAX_TRANSIENT_RETRIES
+        try:
+            if handler.send_message(user, message):
+                return True
+        except requests.ConnectionError:
+            if last_attempt:
+                raise
+        else:
+            if last_attempt or (handler.last_status_code or 0) < 500:
+                return False
+        time.sleep(TRANSIENT_RETRY_DELAY)
 
 
 def send_notify_by_type(notifier_type, data, title, url, channel_title):
@@ -27,7 +47,7 @@ def send_notify_by_type(notifier_type, data, title, url, channel_title):
     """
 
     def send_to_user(handler, message, user):
-        if handler.send_message(user, message):
+        if send_with_transient_retry(handler, user, message):
             return True
 
         status_code = handler.last_status_code
@@ -36,7 +56,7 @@ def send_notify_by_type(notifier_type, data, title, url, channel_title):
             retry_after = handler.last_retry_after
             if retry_after is not None and retry_after <= MAX_RETRY_AFTER:
                 time.sleep(retry_after)
-                if handler.send_message(user, message):
+                if send_with_transient_retry(handler, user, message):
                     return True
             send_exception_log(
                 f"[main] {notifier_type.capitalize()} Message Sent Failed"
@@ -56,7 +76,7 @@ def send_notify_by_type(notifier_type, data, title, url, channel_title):
         fallback_message = get_message(
             notifier_type, "", url, channel_title, data["word_list"]
         )
-        if handler.send_message(user, fallback_message):
+        if send_with_transient_retry(handler, user, fallback_message):
             return True
 
         send_exception_log(

@@ -39,6 +39,13 @@ def handler(monkeypatch):
     return created
 
 
+@pytest.fixture(autouse=True)
+def waits(monkeypatch):
+    slept = []
+    monkeypatch.setattr(notify.time, "sleep", slept.append)
+    return slept
+
+
 @pytest.fixture
 def alerts(monkeypatch):
     sent = []
@@ -71,7 +78,10 @@ def test_connection_error_does_not_block_other_recipients(
 
     run_notify(monkeypatch, telegram_config("a", "b"), [make_result(marked)])
 
-    assert [user for user, _ in handler[0].sent] == ["a", "b"]
+    retries = notify.MAX_TRANSIENT_RETRIES
+    assert [user for user, _ in handler[0].sent] == ["a"] * (retries + 1) + [
+        "b"
+    ]
     assert marked == [True]
     assert len(alerts) == 1
     assert "ConnectionError" in alerts[0]
@@ -113,7 +123,10 @@ def test_fallback_only_on_bad_request(monkeypatch, handler, alerts):
 
     run_notify(monkeypatch, telegram_config("a", "b"), [make_result([])])
 
-    assert [user for user, _ in handler[0].sent] == ["a", "a", "b"]
+    retries = notify.MAX_TRANSIENT_RETRIES
+    assert [user for user, _ in handler[0].sent] == ["a", "a"] + ["b"] * (
+        retries + 1
+    )
 
 
 def test_rate_limit_waits_then_resends_same_message(
@@ -287,3 +300,39 @@ def test_init_baseline_dispatches_by_platform(monkeypatch):
         ("youtube", {"UC1": "UU1", "UC1_member": "UUMO1"}),
         ("twitch", ["chu"]),
     ]
+
+
+def test_connection_error_retries_until_delivered(
+    monkeypatch, handler, alerts, waits
+):
+    replies = iter([requests.ConnectionError(), True])
+
+    def send_message(self, user, message):
+        self.sent.append((user, message))
+        reply = next(replies)
+        if isinstance(reply, Exception):
+            raise reply
+        self.last_status_code = 200
+        return True
+
+    monkeypatch.setattr(FakeHandler, "send_message", send_message)
+    marked = []
+
+    run_notify(monkeypatch, telegram_config("a"), [make_result(marked)])
+
+    assert len(handler[0].sent) == 2
+    assert waits == [notify.TRANSIENT_RETRY_DELAY]
+    assert marked == [True]
+    assert alerts == []
+
+
+def test_server_error_gives_up_after_max_retries(
+    monkeypatch, handler, alerts, waits
+):
+    FakeHandler.replies = {"a": 502}
+
+    run_notify(monkeypatch, telegram_config("a"), [make_result([])])
+
+    assert len(handler[0].sent) == notify.MAX_TRANSIENT_RETRIES + 1
+    assert len(waits) == notify.MAX_TRANSIENT_RETRIES
+    assert "502" in alerts[0]
