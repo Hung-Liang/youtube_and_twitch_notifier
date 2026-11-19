@@ -101,6 +101,22 @@ def test_read_timeout_is_marked_without_resend(monkeypatch, handler, alerts):
     assert "secret" not in alerts[0]
 
 
+@pytest.mark.parametrize(
+    "reply",
+    [requests.ReadTimeout(), requests.ConnectionError(), 400, 404, 429],
+)
+def test_alert_includes_title(monkeypatch, handler, alerts, reply):
+    monkeypatch.setattr(
+        FakeHandler, "last_retry_after", None, raising=False
+    )
+    FakeHandler.replies = {"a": reply}
+
+    run_notify(monkeypatch, telegram_config("a"), [make_result([])])
+
+    assert len(alerts) == 1
+    assert alerts[0].endswith("\nTitle: title")
+
+
 def test_not_marked_when_every_recipient_fails(monkeypatch, handler, alerts):
     FakeHandler.replies = {"a": 500, "b": requests.Timeout()}
     marked = []

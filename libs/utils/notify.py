@@ -46,6 +46,11 @@ def send_notify_by_type(notifier_type, data, title, url, channel_title):
         A list of bools, one per recipient, True if delivered.
     """
 
+    def send_alert(reason):
+        send_exception_log(
+            f"[main] {notifier_type.capitalize()} {reason}\nTitle: {title}"
+        )
+
     def send_to_user(handler, message, user):
         if send_with_transient_retry(handler, user, message):
             return True
@@ -58,19 +63,13 @@ def send_notify_by_type(notifier_type, data, title, url, channel_title):
                 time.sleep(retry_after)
                 if send_with_transient_retry(handler, user, message):
                     return True
-            send_exception_log(
-                f"[main] {notifier_type.capitalize()} Message Sent Failed"
-                f" (429, retry_after={retry_after})"
-            )
+            send_alert(f"Message Sent Failed (429, retry_after={retry_after})")
             return False
 
         # Not found won't recover with a different message, and neither will
         # other errors; only a bad request (e.g. broken HTML) may
         if status_code != 400:
-            send_exception_log(
-                f"[main] {notifier_type.capitalize()} Message Sent Failed"
-                f" ({status_code}, skip fallback)"
-            )
+            send_alert(f"Message Sent Failed ({status_code}, skip fallback)")
             return False
 
         fallback_message = get_message(
@@ -79,9 +78,7 @@ def send_notify_by_type(notifier_type, data, title, url, channel_title):
         if send_with_transient_retry(handler, user, fallback_message):
             return True
 
-        send_exception_log(
-            f"[main] {notifier_type.capitalize()} Message Sent Failed"
-        )
+        send_alert("Message Sent Failed")
         return False
 
     def send_with_retry(handler, message, users):
@@ -93,16 +90,16 @@ def send_notify_by_type(notifier_type, data, title, url, channel_title):
             # The request was sent but the reply was lost, so the message
             # has likely arrived; count it as delivered to avoid a resend
             except requests.ReadTimeout as err:
-                send_exception_log(
-                    f"[main] {notifier_type.capitalize()} Message Delivery"
-                    f" Unknown (recipient #{index}, {type(err).__name__})"
+                send_alert(
+                    "Message Delivery Unknown"
+                    f" (recipient #{index}, {type(err).__name__})"
                 )
                 delivered.append(True)
             except requests.RequestException as err:
                 # Only the error type: its message may contain the bot token
                 # or webhook url
-                send_exception_log(
-                    f"[main] {notifier_type.capitalize()} Message Sent Failed"
+                send_alert(
+                    "Message Sent Failed"
                     f" (recipient #{index}, {type(err).__name__})"
                 )
                 delivered.append(False)
